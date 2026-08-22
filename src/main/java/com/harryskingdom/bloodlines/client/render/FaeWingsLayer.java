@@ -1,7 +1,6 @@
 package com.harryskingdom.bloodlines.client.render;
 
 import com.harryskingdom.bloodlines.BloodlinesMod;
-import com.harryskingdom.bloodlines.integration.pehkui.PehkuiIntegration;
 import com.harryskingdom.bloodlines.race.ClientRaceCache;
 import com.harryskingdom.bloodlines.race.Race;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -38,22 +37,21 @@ import net.minecraft.world.item.ItemStack;
  * fae_wings.png is Medieval Origins Revival's own pixie_wings.png (CC BY 4.0, credit muon-rw - see
  * mods.toml's credits field for the required attribution), an interim placeholder pending commissioned art.
  * <p>
- * Pehkui shrinks Fae's actual body model directly (its bones), not via an outer PoseStack wrap around the whole
- * entity render - so this layer, a separate model entirely, doesn't shrink along with it automatically. Without
- * accounting for that, the wings render at full (unscaled) size against a visibly tiny body, reading as
- * oversized and detached. See PehkuiIntegration.getVisualScale.
+ * WING_SCALE deliberately does NOT compensate for Pehkui's body shrink (tried that, wings ended up too tiny -
+ * the user wants the "too-big-for-a-tiny-fairy" look, not a proportionally-shrunk one) - it's a fixed constant
+ * tuned by eye instead.
  */
 public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> extends ElytraLayer<T, M>
 {
     private static final ResourceLocation TEXTURE = new ResourceLocation(BloodlinesMod.MODID, "textures/entity/fae_wings.png");
-    private static final float WING_SCALE = 1.1F;
+    private static final float WING_SCALE = 1.4F;
 
     private static final float OPEN_ELYTRA_ROT_X = 0.8981317F;
     private static final float OPEN_ELYTRA_ROT_Y = 0.58726646F;
     private static final float OPEN_ELYTRA_ROT_Z = -0.5F - (float) Math.PI / 4F;
     private static final float OPEN_EASING = 0.25F;
 
-    private static final float FLAP_SPEED = 1.4F;
+    private static final float FLAP_SPEED = 3.0F;
     private static final float FLAP_AMPLITUDE_X = 0.35F;
     private static final float FLAP_AMPLITUDE_Z = 0.2F;
 
@@ -78,11 +76,9 @@ public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> ext
     public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight, T entity,
             float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch)
     {
-        float effectiveScale = WING_SCALE * PehkuiIntegration.getVisualScale(entity, partialTicks);
-
         poseStack.pushPose();
         poseStack.translate(0, entity.getBbHeight() * 0.5, 0);
-        poseStack.scale(effectiveScale, effectiveScale, effectiveScale);
+        poseStack.scale(WING_SCALE, WING_SCALE, WING_SCALE);
         poseStack.translate(0, -entity.getBbHeight() * 0.5, 0);
         super.render(poseStack, buffer, packedLight, entity, limbSwing, limbSwingAmount, partialTicks, ageInTicks, netHeadYaw, headPitch);
         poseStack.popPose();
