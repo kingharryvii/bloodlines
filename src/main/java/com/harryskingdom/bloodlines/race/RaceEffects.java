@@ -43,19 +43,35 @@ public final class RaceEffects
 
         if (race == Race.FAE)
         {
-            IcarusIntegration.grantFaeWings(player);
+            IcarusIntegration.removeWings(player);
+            setMayFly(player, true);
             PehkuiIntegration.applyFaeScale(player);
         }
         else if (race == Race.SERAPH)
         {
             IcarusIntegration.grantSeraphWings(player);
+            setMayFly(player, false);
             PehkuiIntegration.resetScale(player);
         }
         else
         {
             IcarusIntegration.removeWings(player);
+            setMayFly(player, false);
+            RaceFlightResource.clear(player);
             PehkuiIntegration.resetScale(player);
         }
+    }
+
+    /** Never touches mayfly/flying for an actually-creative or spectator player - only ever grants/revokes our own. */
+    private static void setMayFly(ServerPlayer player, boolean mayFly)
+    {
+        if (player.isCreative() || player.isSpectator())
+            return;
+
+        player.getAbilities().mayfly = mayFly;
+        if (!mayFly)
+            player.getAbilities().flying = false;
+        player.onUpdateAbilities();
     }
 
     public static void clear(ServerPlayer player)

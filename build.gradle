@@ -148,17 +148,15 @@ dependencies {
     // Soft integration with Pehkui (entity scaling), optional at runtime, for making Fae smaller/daintier.
     compileOnly files('libs/Pehkui-3.8.2+1.20.1-forge.jar')
 
-    // Soft integration with Icarus + Curios: Fae/Seraph get a real Icarus wing item auto-equipped into their
-    // Curios "back" slot, so Icarus's own flight/stamina/animation code runs natively - no custom flight logic
-    // of our own. Icarus itself also needs Caelus, ResourcefulConfig and CommonNetworking at runtime (not
-    // needed at compile time here since we never reference their classes directly). Icarus Rewinged is optional
-    // on top of that, purely for nicer reskinned wing textures when present.
+    // Soft integration with Icarus + Curios: Seraph gets a real Icarus wing item auto-equipped into their
+    // Curios "back" slot, so Icarus's own flight/stamina/animation code runs natively for them - no custom
+    // flight logic of our own. Icarus itself also needs Caelus, ResourcefulConfig and CommonNetworking at
+    // runtime (not needed at compile time here since we never reference their classes directly). Icarus
+    // Rewinged is optional on top of that, purely for a nicer reskinned wing texture when present. Fae does
+    // NOT use this - their flight is fully native (see RaceFlightResource).
     compileOnly files('libs/Icarus-Forge-2.14.0.jar')
     compileOnly files('libs/curios-forge-5.14.1+1.20.1.jar')
     compileOnly files('libs/icarusrewinged-1.1.4-1.20.1-forge.jar')
-
-    // Mixin support, used to stop Icarus's own wing render for Fae so only our custom compact layer draws.
-    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
@@ -190,8 +188,7 @@ tasks.named('jar', Jar).configure {
                 'Implementation-Title'    : project.name,
                 'Implementation-Version'  : project.jar.archiveVersion,
                 'Implementation-Vendor'   : mod_authors,
-                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
-                'MixinConfigs'            : 'harrys_bloodlines.mixins.json'
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
         ])
     }
 

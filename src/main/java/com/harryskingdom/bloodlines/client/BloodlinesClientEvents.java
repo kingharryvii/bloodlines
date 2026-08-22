@@ -1,10 +1,11 @@
 package com.harryskingdom.bloodlines.client;
 
 import com.harryskingdom.bloodlines.BloodlinesMod;
-import com.harryskingdom.bloodlines.integration.icarus.IcarusIntegration;
 import com.harryskingdom.bloodlines.network.BloodlinesNetwork;
 import com.harryskingdom.bloodlines.network.HoverInputPacket;
 import com.harryskingdom.bloodlines.network.UseRaceAbilityPacket;
+import com.harryskingdom.bloodlines.race.ClientRaceCache;
+import com.harryskingdom.bloodlines.race.Race;
 import com.harryskingdom.bloodlines.race.RaceAbility;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
@@ -63,7 +64,7 @@ public class BloodlinesClientEvents
 
         for (AbstractClientPlayer player : minecraft.level.players())
         {
-            if (IcarusIntegration.isFaeWingsEquipped(player))
+            if (ClientRaceCache.get(player.getId()) == Race.FAE)
                 updateFaeWingFlap(player);
         }
     }

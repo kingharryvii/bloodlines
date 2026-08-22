@@ -1,7 +1,8 @@
 package com.harryskingdom.bloodlines.client.render;
 
 import com.harryskingdom.bloodlines.BloodlinesMod;
-import com.harryskingdom.bloodlines.integration.icarus.IcarusIntegration;
+import com.harryskingdom.bloodlines.race.ClientRaceCache;
+import com.harryskingdom.bloodlines.race.Race;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.geom.EntityModelSet;
@@ -13,10 +14,11 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Draws a butterfly-shaped elytra model (reusing Medieval Origins Revival's pixie wing texture, CC BY 4.0,
- * credit muon-rw) on Fae players instead of Icarus's own bulkier wing model — Icarus's wings are still equipped
- * and hidden (see IcarusIntegration) so the real flight mechanic keeps working underneath. Rendered at WING_SCALE
- * so they read as a dramatic wingspan rather than getting lost against the (separately Pehkui-shrunk) Fae body.
+ * Draws a butterfly-shaped elytra model on Fae players - reuses vanilla's own ElytraLayer/ElytraModel with a
+ * custom texture, so the geometry/UV/positioning is vanilla's own already-correct elytra shape, not anything
+ * built from scratch. No Icarus item involved at all: Fae's flight is now fully native (see RaceFlightResource),
+ * so this is gated purely on race. Rendered at WING_SCALE so they read as a dramatic wingspan rather than
+ * getting lost against the (separately Pehkui-shrunk) Fae body.
  */
 public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> extends ElytraLayer<T, M>
 {
@@ -31,7 +33,7 @@ public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> ext
     @Override
     public boolean shouldRender(ItemStack stack, T entity)
     {
-        return IcarusIntegration.isFaeWingsEquipped(entity);
+        return ClientRaceCache.get(entity.getId()) == Race.FAE;
     }
 
     @Override

@@ -6,7 +6,6 @@ import dev.cammiescorner.icarus.item.WingItem;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
@@ -15,20 +14,21 @@ import top.theillusivec4.curios.api.CuriosApi;
 import java.util.function.Supplier;
 
 /**
- * Soft integration with the Icarus flight mod (via Curios' "back" slot), granting real, sustained flight to winged
- * races instead of a fake slow-falling effect. Uses Icarus Rewinged's wing textures when that addon is present for
- * a nicer look, falling back to core Icarus wings otherwise. No-ops entirely if Icarus or Curios isn't installed.
+ * Soft integration with the Icarus flight mod (via Curios' "back" slot), granting real, sustained flight to
+ * Seraph instead of a fake slow-falling effect. Uses Icarus Rewinged's wing textures when that addon is present
+ * for a nicer look, falling back to core Icarus wings otherwise. No-ops entirely if Icarus or Curios isn't
+ * installed.
  * <p>
- * Fae's Icarus wing item is equipped for the flight mechanic, but Icarus's own render of it is cancelled for Fae
- * specifically by {@code IcarusWingsLayerMixin}, since {@code FaeWingsLayer} draws a custom compact butterfly-elytra
- * model instead — Icarus's own wing models read as too large/dramatic for Fae's "small and fairy-like" identity.
- * Seraph keeps Icarus's own render as-is; their wings are meant to look big and dramatic.
+ * Fae does NOT use this - their flight is fully native now (see RaceFlightResource), modeled on Medieval Origins
+ * Revival's own Pixie race rather than Icarus. Trying to keep both a custom wing render and a hidden real Icarus
+ * item for Fae simultaneously (three different suppression techniques: Curios' render toggle, a transparent
+ * texture override, and a Mixin cancelling Icarus's own render call) never reliably worked, so Fae is kept
+ * entirely independent of Icarus/Curios to remove that whole class of bug.
  */
 public final class IcarusIntegration
 {
     private static final String BACK_SLOT = "back";
     private static final String RACE_TAG = "BloodlinesRacialWingsRace";
-    private static final String FAE_RACE_VALUE = "fae";
     private static final String SERAPH_RACE_VALUE = "seraph";
 
     private IcarusIntegration() {}
@@ -41,13 +41,6 @@ public final class IcarusIntegration
     private static boolean isRewingedLoaded()
     {
         return ModList.get().isLoaded("icarusrewinged");
-    }
-
-    /** Equips the Fae's wings; Icarus's own render of them is cancelled elsewhere by IcarusWingsLayerMixin. */
-    public static void grantFaeWings(ServerPlayer player)
-    {
-        Supplier<? extends Item> wingType = isRewingedLoaded() ? IcarusReItems.ZANZAS_BUTTERFLY_PURPLE_WINGS : IcarusItems.PINK_FEATHERED_WINGS;
-        grantWings(player, wingType, "Fae Wings", FAE_RACE_VALUE);
     }
 
     /** Equips the Seraph's big white-and-gold angel wings, rendered normally by Icarus. */
@@ -69,28 +62,6 @@ public final class IcarusIntegration
                                 .ifPresent(stacksHandler -> stacksHandler.getStacks().setStackInSlot(result.slotContext().index(), ItemStack.EMPTY))));
     }
 
-    /** Client-safe check: does this entity currently have Fae's racial wings equipped? Used by FaeWingsLayer. */
-    public static boolean isFaeWingsEquipped(LivingEntity entity)
-    {
-        if (!isLoaded())
-            return false;
-
-        return CuriosApi.getCuriosInventory(entity)
-                .map(handler -> handler.findFirstCurio(IcarusIntegration::isFaeWings).isPresent())
-                .orElse(false);
-    }
-
-    /** Client-safe check: does this entity have either racial wing pair (Fae or Seraph) equipped? Used for the flap animation. */
-    public static boolean isAnyRacialWingsEquipped(LivingEntity entity)
-    {
-        if (!isLoaded())
-            return false;
-
-        return CuriosApi.getCuriosInventory(entity)
-                .map(handler -> handler.findFirstCurio(IcarusIntegration::isRacialWings).isPresent())
-                .orElse(false);
-    }
-
     private static void grantWings(ServerPlayer player, Supplier<? extends Item> wingType, String name, String raceTag)
     {
         if (!isLoaded())
@@ -109,11 +80,6 @@ public final class IcarusIntegration
     private static boolean isRacialWings(ItemStack stack)
     {
         return stack.getTag() != null && stack.getTag().contains(RACE_TAG);
-    }
-
-    private static boolean isFaeWings(ItemStack stack)
-    {
-        return stack.getTag() != null && FAE_RACE_VALUE.equals(stack.getTag().getString(RACE_TAG));
     }
 
     private static ItemStack createWings(Supplier<? extends Item> wingType, String name, String raceTag)

@@ -93,6 +93,12 @@ public class RaceEffectEvents
 
         if (player.hasEffect(MobEffects.LEVITATION))
             RaceAbility.updateHoverMovement(player, RaceHoverState.isJumping(player));
+
+        withRace(player, race ->
+        {
+            if (race == Race.FAE)
+                RaceFlightResource.tick(player);
+        });
     }
 
     private static void withRace(ServerPlayer player, java.util.function.Consumer<Race> action)
