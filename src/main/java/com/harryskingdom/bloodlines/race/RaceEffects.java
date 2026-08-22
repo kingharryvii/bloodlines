@@ -42,11 +42,20 @@ public final class RaceEffects
         setInnateEffect(player, MobEffects.DOLPHINS_GRACE, stats.aquatic());
 
         if (race == Race.FAE)
+        {
+            IcarusIntegration.grantFaeWings(player);
             PehkuiIntegration.applyFaeScale(player);
-        else
+        }
+        else if (race == Race.SERAPH)
+        {
+            IcarusIntegration.grantSeraphWings(player);
             PehkuiIntegration.resetScale(player);
-
-        IcarusIntegration.updateWings(player, race);
+        }
+        else
+        {
+            IcarusIntegration.removeWings(player);
+            PehkuiIntegration.resetScale(player);
+        }
     }
 
     public static void clear(ServerPlayer player)
@@ -67,7 +76,7 @@ public final class RaceEffects
         RaceHoverState.clear(player);
 
         PehkuiIntegration.resetScale(player);
-        IcarusIntegration.updateWings(player, null);
+        IcarusIntegration.removeWings(player);
     }
 
     private static void setInnateEffect(ServerPlayer player, net.minecraft.world.effect.MobEffect effect, boolean shouldHave)

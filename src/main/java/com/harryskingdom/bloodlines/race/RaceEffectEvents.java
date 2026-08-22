@@ -92,10 +92,7 @@ public class RaceEffectEvents
             return;
 
         if (player.hasEffect(MobEffects.LEVITATION))
-        {
             RaceAbility.updateHoverMovement(player, RaceHoverState.isJumping(player));
-            withRace(player, race -> RaceAbility.updateHoverWingState(player, race));
-        }
     }
 
     private static void withRace(ServerPlayer player, java.util.function.Consumer<Race> action)

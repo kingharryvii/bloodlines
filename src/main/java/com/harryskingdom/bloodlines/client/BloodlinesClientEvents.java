@@ -1,11 +1,10 @@
 package com.harryskingdom.bloodlines.client;
 
 import com.harryskingdom.bloodlines.BloodlinesMod;
+import com.harryskingdom.bloodlines.integration.icarus.IcarusIntegration;
 import com.harryskingdom.bloodlines.network.BloodlinesNetwork;
 import com.harryskingdom.bloodlines.network.HoverInputPacket;
 import com.harryskingdom.bloodlines.network.UseRaceAbilityPacket;
-import com.harryskingdom.bloodlines.race.ClientRaceCache;
-import com.harryskingdom.bloodlines.race.Race;
 import com.harryskingdom.bloodlines.race.RaceAbility;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
@@ -20,11 +19,9 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Fae's custom wing pose is driven by the same public elytraRotX/Y/Z fields vanilla uses to animate a real
- * elytra, so we can pose them here each tick without touching vanilla's own model code at all - this keeps
- * working unchanged under real Icarus flight since isFallFlying()/movement are genuine vanilla state regardless
- * of what triggered them. Seraph uses Icarus's own native wings/animation instead, so isn't handled here. Flap
- * logic ported from Medieval Origins Revival's own client-side animation (CC BY 4.0, credit muon-rw).
+ * Fae's butterfly-elytra wing pose is driven by the same public elytraRotX/Y/Z fields vanilla uses to animate a
+ * real elytra, so we can pose them here each tick without touching Icarus or vanilla's own model code at all.
+ * Logic ported from Medieval Origins Revival's own client-side flap animation (CC BY 4.0, credit muon-rw).
  */
 @Mod.EventBusSubscriber(modid = BloodlinesMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public class BloodlinesClientEvents
@@ -52,15 +49,10 @@ public class BloodlinesClientEvents
         if (minecraft.level == null)
             return;
 
-        // Hover's vertical control needs the jump-held state synced to the server each time it changes -
-        // hasEffect(LEVITATION) alone is a reliable gate on its own. Double-jump flight is handled entirely by
-        // the real Icarus mod now (IcarusIntegration equips the wing item, Icarus does the rest natively) - no
-        // packet or per-tick handling of our own needed for it at all.
         if (minecraft.player != null && minecraft.player.hasEffect(MobEffects.LEVITATION))
         {
             boolean jumping = minecraft.options.keyJump.isDown();
             RaceAbility.updateHoverMovement(minecraft.player, jumping);
-            RaceAbility.updateHoverWingState(minecraft.player, ClientRaceCache.get(minecraft.player.getId()));
 
             if (jumping != lastSentJumping)
             {
@@ -71,26 +63,14 @@ public class BloodlinesClientEvents
 
         for (AbstractClientPlayer player : minecraft.level.players())
         {
-            if (ClientRaceCache.get(player.getId()) == Race.FAE)
-                updateWingFlap(player);
+            if (IcarusIntegration.isFaeWingsEquipped(player))
+                updateFaeWingFlap(player);
         }
     }
 
-    private static void updateWingFlap(AbstractClientPlayer player)
+    private static void updateFaeWingFlap(AbstractClientPlayer player)
     {
-        // Hover holds a fixed vertical position rather than building real forward speed, so the movement-based
-        // flap strength below (which reads off actual velocity) would barely move - use a steady time-based
-        // flap instead, so wings actively beat to hold position rather than freezing in a static spread.
-        if (player.hasEffect(MobEffects.LEVITATION))
-        {
-            float flapStrength = 0.5F + 0.5F * (float) Math.sin(player.tickCount * 0.4F);
-            player.elytraRotX = WINGS_SPREAD_X * flapStrength;
-            player.elytraRotY = WINGS_SPREAD_Y * flapStrength;
-            player.elytraRotZ = WINGS_SPREAD_Z * flapStrength;
-            return;
-        }
-
-        if (player.getAbilities().flying)
+        if (player.getAbilities().flying || player.hasEffect(MobEffects.LEVITATION))
         {
             player.elytraRotX = WINGS_SPREAD_X;
             player.elytraRotY = WINGS_SPREAD_Y;

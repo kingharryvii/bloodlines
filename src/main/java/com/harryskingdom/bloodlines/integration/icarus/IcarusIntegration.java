@@ -1,33 +1,35 @@
 package com.harryskingdom.bloodlines.integration.icarus;
 
-import com.harryskingdom.bloodlines.race.Race;
-import net.minecraft.resources.ResourceLocation;
+import com.r3x.icarusrewinged.registry.IcarusReItems;
+import dev.cammiescorner.icarus.init.IcarusItems;
+import dev.cammiescorner.icarus.item.WingItem;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
-import net.minecraftforge.registries.ForgeRegistries;
 import top.theillusivec4.curios.api.CuriosApi;
-import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
+
+import java.util.function.Supplier;
 
 /**
- * Real integration with Icarus + Curios: Fae and Seraph get an actual Icarus wing item auto-equipped into their
- * Curios "back" slot on race selection, so Icarus's own mod code (the real flight trigger, stamina, boost,
- * loop-de-loop, wing durability - all of it) runs completely natively, exactly as it would for any player who
- * equipped wings themselves. No custom flight code of our own is needed at all.
+ * Soft integration with the Icarus flight mod (via Curios' "back" slot), granting real, sustained flight to winged
+ * races instead of a fake slow-falling effect. Uses Icarus Rewinged's wing textures when that addon is present for
+ * a nicer look, falling back to core Icarus wings otherwise. No-ops entirely if Icarus or Curios isn't installed.
  * <p>
- * Seraph shows Icarus's own white Feathered Wings render, fully visible, animated by Icarus itself. Fae keeps
- * its own custom-modeled wings (RaceWingModel/RacialWingsLayer) instead: the purple Feathered Wings item here is
- * still equipped (Fae needs it for Icarus's flight mechanics same as Seraph), but its render is suppressed via
- * IcarusAPIClient.addRenderPredicate (see BloodlinesClientSetup) so only the custom wings show.
- * <p>
- * No-ops entirely if Icarus or Curios isn't loaded.
+ * Fae's Icarus wing item is equipped for the flight mechanic, but Icarus's own render of it is cancelled for Fae
+ * specifically by {@code IcarusWingsLayerMixin}, since {@code FaeWingsLayer} draws a custom compact butterfly-elytra
+ * model instead — Icarus's own wing models read as too large/dramatic for Fae's "small and fairy-like" identity.
+ * Seraph keeps Icarus's own render as-is; their wings are meant to look big and dramatic.
  */
 public final class IcarusIntegration
 {
-    private static final String SLOT = "back";
-    private static final ResourceLocation FAE_WINGS = new ResourceLocation("icarus", "purple_feathered_wings");
-    private static final ResourceLocation SERAPH_WINGS = new ResourceLocation("icarus", "white_feathered_wings");
+    private static final String BACK_SLOT = "back";
+    private static final String RACE_TAG = "BloodlinesRacialWingsRace";
+    private static final String FAE_RACE_VALUE = "fae";
+    private static final String SERAPH_RACE_VALUE = "seraph";
 
     private IcarusIntegration() {}
 
@@ -36,41 +38,93 @@ public final class IcarusIntegration
         return ModList.get().isLoaded("icarus") && ModList.get().isLoaded("curios");
     }
 
-    /** Pass the player's current race, or null if they no longer have a flying race. */
-    public static void updateWings(ServerPlayer player, Race race)
+    private static boolean isRewingedLoaded()
+    {
+        return ModList.get().isLoaded("icarusrewinged");
+    }
+
+    /** Equips the Fae's wings; Icarus's own render of them is cancelled elsewhere by IcarusWingsLayerMixin. */
+    public static void grantFaeWings(ServerPlayer player)
+    {
+        Supplier<? extends Item> wingType = isRewingedLoaded() ? IcarusReItems.ZANZAS_BUTTERFLY_PURPLE_WINGS : IcarusItems.PINK_FEATHERED_WINGS;
+        grantWings(player, wingType, "Fae Wings", FAE_RACE_VALUE);
+    }
+
+    /** Equips the Seraph's big white-and-gold angel wings, rendered normally by Icarus. */
+    public static void grantSeraphWings(ServerPlayer player)
+    {
+        Supplier<? extends Item> wingType = isRewingedLoaded() ? IcarusReItems.FEATHERED_GILDED_WHITE_WINGS : IcarusItems.WHITE_FEATHERED_WINGS;
+        grantWings(player, wingType, "Seraph Wings", SERAPH_RACE_VALUE);
+    }
+
+    /** Removes the racial wings if the player is currently wearing the pair we gave them. */
+    public static void removeWings(ServerPlayer player)
     {
         if (!isLoaded())
             return;
 
-        ResourceLocation wingsId = race == Race.FAE ? FAE_WINGS : race == Race.SERAPH ? SERAPH_WINGS : null;
-
-        CuriosApi.getCuriosInventory(player).ifPresent(handler -> handler.getStacksHandler(SLOT).ifPresent(stacksHandler ->
-        {
-            IDynamicStackHandler stacks = stacksHandler.getStacks();
-            ItemStack current = stacks.getStackInSlot(0);
-
-            if (wingsId == null)
-            {
-                if (isIcarusWings(current))
-                    stacks.setStackInSlot(0, ItemStack.EMPTY);
-                return;
-            }
-
-            Item wingItem = ForgeRegistries.ITEMS.getValue(wingsId);
-            if (wingItem == null || current.is(wingItem))
-                return;
-
-            stacks.setStackInSlot(0, new ItemStack(wingItem));
-            stacksHandler.update();
-        }));
+        CuriosApi.getCuriosInventory(player).ifPresent(handler ->
+                handler.findFirstCurio(IcarusIntegration::isRacialWings).ifPresent(result ->
+                        handler.getStacksHandler(result.slotContext().identifier())
+                                .ifPresent(stacksHandler -> stacksHandler.getStacks().setStackInSlot(result.slotContext().index(), ItemStack.EMPTY))));
     }
 
-    private static boolean isIcarusWings(ItemStack stack)
+    /** Client-safe check: does this entity currently have Fae's racial wings equipped? Used by FaeWingsLayer. */
+    public static boolean isFaeWingsEquipped(LivingEntity entity)
     {
-        if (stack.isEmpty())
+        if (!isLoaded())
             return false;
 
-        ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
-        return id != null && id.getNamespace().equals("icarus");
+        return CuriosApi.getCuriosInventory(entity)
+                .map(handler -> handler.findFirstCurio(IcarusIntegration::isFaeWings).isPresent())
+                .orElse(false);
+    }
+
+    /** Client-safe check: does this entity have either racial wing pair (Fae or Seraph) equipped? Used for the flap animation. */
+    public static boolean isAnyRacialWingsEquipped(LivingEntity entity)
+    {
+        if (!isLoaded())
+            return false;
+
+        return CuriosApi.getCuriosInventory(entity)
+                .map(handler -> handler.findFirstCurio(IcarusIntegration::isRacialWings).isPresent())
+                .orElse(false);
+    }
+
+    private static void grantWings(ServerPlayer player, Supplier<? extends Item> wingType, String name, String raceTag)
+    {
+        if (!isLoaded())
+            return;
+
+        CuriosApi.getCuriosInventory(player).ifPresent(handler ->
+        {
+            if (handler.isEquipped(stack -> stack.getItem() instanceof WingItem))
+                return;
+
+            handler.getStacksHandler(BACK_SLOT).ifPresent(stacksHandler ->
+                    stacksHandler.getStacks().setStackInSlot(0, createWings(wingType, name, raceTag)));
+        });
+    }
+
+    private static boolean isRacialWings(ItemStack stack)
+    {
+        return stack.getTag() != null && stack.getTag().contains(RACE_TAG);
+    }
+
+    private static boolean isFaeWings(ItemStack stack)
+    {
+        return stack.getTag() != null && FAE_RACE_VALUE.equals(stack.getTag().getString(RACE_TAG));
+    }
+
+    private static ItemStack createWings(Supplier<? extends Item> wingType, String name, String raceTag)
+    {
+        ItemStack stack = new ItemStack(wingType.get());
+
+        CompoundTag tag = stack.getOrCreateTag();
+        tag.putString(RACE_TAG, raceTag);
+        tag.putBoolean("Unbreakable", true);
+        stack.setHoverName(Component.literal(name));
+
+        return stack;
     }
 }
