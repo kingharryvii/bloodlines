@@ -57,7 +57,6 @@ public final class RaceEffects
         {
             IcarusIntegration.removeWings(player);
             setMayFly(player, false);
-            RaceFlightResource.clear(player);
             PehkuiIntegration.resetScale(player);
         }
     }
@@ -90,7 +89,6 @@ public final class RaceEffects
         player.removeEffect(MobEffects.DOLPHINS_GRACE);
 
         setMayFly(player, false);
-        RaceFlightResource.clear(player);
         PehkuiIntegration.resetScale(player);
         IcarusIntegration.removeWings(player);
     }

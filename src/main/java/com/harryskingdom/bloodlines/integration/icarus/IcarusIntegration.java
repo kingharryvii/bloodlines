@@ -19,7 +19,7 @@ import java.util.function.Supplier;
  * for a nicer look, falling back to core Icarus wings otherwise. No-ops entirely if Icarus or Curios isn't
  * installed.
  * <p>
- * Fae does NOT use this - their flight is fully native now (see RaceFlightResource), modeled on Medieval Origins
+ * Fae does NOT use this - their flight is fully native now (see RaceFlightFood), modeled on Medieval Origins
  * Revival's own Pixie race rather than Icarus. Trying to keep both a custom wing render and a hidden real Icarus
  * item for Fae simultaneously (three different suppression techniques: Curios' render toggle, a transparent
  * texture override, and a Mixin cancelling Icarus's own render call) never reliably worked, so Fae is kept

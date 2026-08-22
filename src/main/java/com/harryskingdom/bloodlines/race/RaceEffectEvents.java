@@ -93,7 +93,7 @@ public class RaceEffectEvents
         withRace(player, race ->
         {
             if (race == Race.FAE)
-                RaceFlightResource.tick(player);
+                RaceFlightFood.tick(player);
         });
     }
 
