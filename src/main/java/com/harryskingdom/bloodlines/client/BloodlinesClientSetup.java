@@ -25,7 +25,7 @@ public class BloodlinesClientSetup
         for (String skin : event.getSkins())
         {
             PlayerRenderer renderer = event.getSkin(skin);
-            renderer.addLayer(new FaeWingsLayer<>(renderer));
+            renderer.addLayer(new FaeWingsLayer<>(renderer, event.getEntityModels()));
         }
     }
 }
