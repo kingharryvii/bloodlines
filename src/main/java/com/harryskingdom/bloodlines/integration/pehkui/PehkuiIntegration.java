@@ -1,9 +1,11 @@
 package com.harryskingdom.bloodlines.integration.pehkui;
 
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.fml.ModList;
 import virtuoel.pehkui.api.ScaleData;
 import virtuoel.pehkui.api.ScaleTypes;
+import virtuoel.pehkui.util.ScaleUtils;
 
 /**
  * Soft integration with Pehkui (entity scaling), used to make Fae read as small and fairy-like rather than just
@@ -19,6 +21,17 @@ public final class PehkuiIntegration
     public static boolean isLoaded()
     {
         return ModList.get().isLoaded("pehkui");
+    }
+
+    /**
+     * Pehkui shrinks the player's own body model directly (its bones, not an outer PoseStack wrap around the
+     * whole entity render), so anything rendered as a separate model in its own RenderLayer - like Fae's wings -
+     * doesn't automatically shrink along with it. Callers that need to stay proportional to the current body
+     * size (1.0 when Pehkui isn't installed or hasn't scaled this entity) should multiply by this.
+     */
+    public static float getVisualScale(LivingEntity entity, float partialTicks)
+    {
+        return isLoaded() ? ScaleUtils.getModelHeightScale(entity, partialTicks) : 1.0F;
     }
 
     public static void applyFaeScale(ServerPlayer player)

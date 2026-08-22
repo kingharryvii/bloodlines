@@ -1,6 +1,7 @@
 package com.harryskingdom.bloodlines.client.render;
 
 import com.harryskingdom.bloodlines.BloodlinesMod;
+import com.harryskingdom.bloodlines.integration.pehkui.PehkuiIntegration;
 import com.harryskingdom.bloodlines.race.ClientRaceCache;
 import com.harryskingdom.bloodlines.race.Race;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -34,6 +35,11 @@ import net.minecraft.world.item.ItemStack;
  * <p>
  * fae_wings.png is Medieval Origins Revival's own pixie_wings.png (CC BY 4.0, credit muon-rw - see
  * mods.toml's credits field for the required attribution), an interim placeholder pending commissioned art.
+ * <p>
+ * Pehkui shrinks Fae's actual body model directly (its bones), not via an outer PoseStack wrap around the whole
+ * entity render - so this layer, a separate model entirely, doesn't shrink along with it automatically. Without
+ * accounting for that, the wings render at full (unscaled) size against a visibly tiny body, reading as
+ * oversized and detached. See PehkuiIntegration.getVisualScale.
  */
 public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> extends ElytraLayer<T, M>
 {
@@ -66,9 +72,11 @@ public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> ext
     public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight, T entity,
             float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch)
     {
+        float effectiveScale = WING_SCALE * PehkuiIntegration.getVisualScale(entity, partialTicks);
+
         poseStack.pushPose();
         poseStack.translate(0, entity.getBbHeight() * 0.5, 0);
-        poseStack.scale(WING_SCALE, WING_SCALE, WING_SCALE);
+        poseStack.scale(effectiveScale, effectiveScale, effectiveScale);
         poseStack.translate(0, -entity.getBbHeight() * 0.5, 0);
         super.render(poseStack, buffer, packedLight, entity, limbSwing, limbSwingAmount, partialTicks, ageInTicks, netHeadYaw, headPitch);
         poseStack.popPose();
