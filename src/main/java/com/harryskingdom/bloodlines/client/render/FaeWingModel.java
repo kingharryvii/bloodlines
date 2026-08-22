@@ -13,41 +13,50 @@ import net.minecraft.client.model.geom.builders.PartDefinition;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Dedicated butterfly-style wing rig for the Fae, replacing vanilla's ElytraModel reuse (whose wing cubes are a
- * 2-wide x 20-tall strip - a narrow cape by construction, no texture can fix that).
+ * Articulated butterfly-style wing rig for the Fae. Each side is two independent joint chains anchored on the
+ * upper back: upper wing (base -> mid -> tip, the dominant section) and lower wing (base -> tip, smaller),
+ * exactly mirroring the Bloodlines Fae wing blueprint's five named parts. Each joint only carries its own
+ * rotation offset from its parent, so a chain bends like a multi-segment arm rather than swinging as one flat
+ * plane - that's what gives the silhouette its curve, since the boxes themselves stay rectangular.
  * <p>
- * Each side has an independent root bone (pivoting near the upper back) carrying two leaf parts: a large upper
- * wing (~65% of the surface area) and a smaller lower wing (~35%), overlapping slightly at the root. The root
- * bone handles the overall open/fold spread; the upper and lower parts carry their own additional rotation so
- * they can move with a slight timing offset during a flap.
- * <p>
- * Texture layout (see fae_wings.png, 32x32): the right-side upper wing template lives at (0,0)-(24,10), the
- * right-side lower wing template at (0,11)-(18,18). The left side reuses both regions mirrored, so only one
- * pair of wing shapes needs to be drawn.
+ * The "outward" rest direction for every part is +X (right side) / -X (left side, mirrored). Rotating a chain
+ * around Z sweeps it between pointing sideways (open) and pointing straight down the spine (folded), which is
+ * the axis {@link FaeWingsLayer} drives every frame; rotating around X (only exposed on the base joints, since
+ * children inherit it) tilts the whole chain forward/back for a bit of depth to the motion.
  */
 public class FaeWingModel
 {
     public static final ModelLayerLocation LAYER_LOCATION =
             new ModelLayerLocation(new ResourceLocation(BloodlinesMod.MODID, "fae_wings"), "main");
 
-    private static final int TEXTURE_WIDTH = 32;
-    private static final int TEXTURE_HEIGHT = 32;
+    private static final int TEXTURE_WIDTH = 16;
+    private static final int TEXTURE_HEIGHT = 40;
 
-    private final ModelPart rightWingRoot;
-    private final ModelPart rightUpperWing;
-    private final ModelPart rightLowerWing;
-    private final ModelPart leftWingRoot;
-    private final ModelPart leftUpperWing;
-    private final ModelPart leftLowerWing;
+    private final ModelPart rightUpperBase;
+    private final ModelPart rightUpperMid;
+    private final ModelPart rightUpperTip;
+    private final ModelPart rightLowerBase;
+    private final ModelPart rightLowerTip;
+
+    private final ModelPart leftUpperBase;
+    private final ModelPart leftUpperMid;
+    private final ModelPart leftUpperTip;
+    private final ModelPart leftLowerBase;
+    private final ModelPart leftLowerTip;
 
     public FaeWingModel(ModelPart root)
     {
-        this.rightWingRoot = root.getChild("right_wing_root");
-        this.rightUpperWing = rightWingRoot.getChild("right_upper_wing");
-        this.rightLowerWing = rightWingRoot.getChild("right_lower_wing");
-        this.leftWingRoot = root.getChild("left_wing_root");
-        this.leftUpperWing = leftWingRoot.getChild("left_upper_wing");
-        this.leftLowerWing = leftWingRoot.getChild("left_lower_wing");
+        this.rightUpperBase = root.getChild("right_upper_base");
+        this.rightUpperMid = rightUpperBase.getChild("right_upper_mid");
+        this.rightUpperTip = rightUpperMid.getChild("right_upper_tip");
+        this.rightLowerBase = root.getChild("right_lower_base");
+        this.rightLowerTip = rightLowerBase.getChild("right_lower_tip");
+
+        this.leftUpperBase = root.getChild("left_upper_base");
+        this.leftUpperMid = leftUpperBase.getChild("left_upper_mid");
+        this.leftUpperTip = leftUpperMid.getChild("left_upper_tip");
+        this.leftLowerBase = root.getChild("left_lower_base");
+        this.leftLowerTip = leftLowerBase.getChild("left_lower_tip");
     }
 
     public static LayerDefinition createBodyLayer()
@@ -55,92 +64,83 @@ public class FaeWingModel
         MeshDefinition mesh = new MeshDefinition();
         PartDefinition parts = mesh.getRoot();
 
-        PartDefinition rightRoot = parts.addOrReplaceChild("right_wing_root",
-                CubeListBuilder.create(), PartPose.offset(4.5F, 0.0F, 2.0F));
-        rightRoot.addOrReplaceChild("right_upper_wing",
-                CubeListBuilder.create().texOffs(0, 0).addBox(0.0F, -4.0F, -0.5F, 11.0F, 9.0F, 1.0F),
-                PartPose.ZERO);
-        rightRoot.addOrReplaceChild("right_lower_wing",
-                CubeListBuilder.create().texOffs(0, 11).addBox(0.0F, 3.0F, -0.5F, 8.0F, 6.0F, 1.0F),
-                PartPose.ZERO);
-
-        PartDefinition leftRoot = parts.addOrReplaceChild("left_wing_root",
-                CubeListBuilder.create(), PartPose.offset(-4.5F, 0.0F, 2.0F));
-        leftRoot.addOrReplaceChild("left_upper_wing",
-                CubeListBuilder.create().texOffs(0, 0).mirror().addBox(-11.0F, -4.0F, -0.5F, 11.0F, 9.0F, 1.0F),
-                PartPose.ZERO);
-        leftRoot.addOrReplaceChild("left_lower_wing",
-                CubeListBuilder.create().texOffs(0, 11).mirror().addBox(-8.0F, 3.0F, -0.5F, 8.0F, 6.0F, 1.0F),
-                PartPose.ZERO);
+        buildSide(parts, false);
+        buildSide(parts, true);
 
         return LayerDefinition.create(mesh, TEXTURE_WIDTH, TEXTURE_HEIGHT);
     }
 
-    /**
-     * Poses every part for this frame. {@code openAmount} (0=folded, 1=fully spread) should already be smoothed
-     * frame-to-frame by the caller. {@code flapping} enables the butterfly wingbeat layered on top of the open
-     * pose; {@code flapPhase} is a continuously increasing angle (e.g. ageInTicks * speed) driving that beat.
-     */
-    public void setPose(float openAmount, boolean flapping, float flapPhase)
+    private static void buildSide(PartDefinition parts, boolean left)
     {
-        float rootYaw = lerp(openAmount, FOLDED_ROOT_YAW, OPEN_ROOT_YAW);
-        float rootPitch = lerp(openAmount, FOLDED_ROOT_PITCH, OPEN_ROOT_PITCH);
-        float upperPitch = lerp(openAmount, FOLDED_UPPER_PITCH, OPEN_UPPER_PITCH);
-        float lowerPitch = lerp(openAmount, FOLDED_LOWER_PITCH, OPEN_LOWER_PITCH);
+        String side = left ? "left" : "right";
+        float sign = left ? -1.0F : 1.0F;
 
-        float upperFlap = 0.0F;
-        float lowerFlap = 0.0F;
-        float upperRoll = 0.0F;
-        float lowerRoll = 0.0F;
-        if (flapping)
-        {
-            upperFlap = (float) Math.sin(flapPhase) * FLAP_AMPLITUDE_UPPER;
-            lowerFlap = (float) Math.sin(flapPhase - FLAP_LAG) * FLAP_AMPLITUDE_LOWER;
-            upperRoll = (float) Math.cos(flapPhase) * FLAP_ROLL_AMPLITUDE;
-            lowerRoll = (float) Math.cos(flapPhase - FLAP_LAG) * FLAP_ROLL_AMPLITUDE;
-        }
+        PartDefinition upperBase = parts.addOrReplaceChild(side + "_upper_base",
+                box(left, 5, 7).texOffs(0, 0),
+                PartPose.offset(sign * 4.0F, -1.0F, 1.8F));
+        PartDefinition upperMid = upperBase.addOrReplaceChild(side + "_upper_mid",
+                box(left, 5, 6).texOffs(0, 9),
+                PartPose.offset(sign * 5.0F, 0.0F, 0.0F));
+        upperMid.addOrReplaceChild(side + "_upper_tip",
+                box(left, 4, 4).texOffs(0, 17),
+                PartPose.offset(sign * 5.0F, 0.0F, 0.0F));
 
-        rightWingRoot.yRot = rootYaw;
-        rightWingRoot.xRot = rootPitch;
-        rightUpperWing.xRot = upperPitch + upperFlap;
-        rightUpperWing.zRot = upperRoll;
-        rightLowerWing.xRot = lowerPitch + lowerFlap;
-        rightLowerWing.zRot = lowerRoll;
-
-        leftWingRoot.yRot = -rootYaw;
-        leftWingRoot.xRot = rootPitch;
-        leftUpperWing.xRot = upperPitch + upperFlap;
-        leftUpperWing.zRot = -upperRoll;
-        leftLowerWing.xRot = lowerPitch + lowerFlap;
-        leftLowerWing.zRot = -lowerRoll;
+        PartDefinition lowerBase = parts.addOrReplaceChild(side + "_lower_base",
+                box(left, 4, 5).texOffs(0, 23),
+                PartPose.offset(sign * 4.0F, 1.2F, 2.3F));
+        lowerBase.addOrReplaceChild(side + "_lower_tip",
+                box(left, 3, 4).texOffs(0, 30),
+                PartPose.offset(sign * 4.0F, 0.0F, 0.0F));
     }
 
+    /** A thin (1-deep) box of the given width/height, centered vertically and depth-wise on its own pivot. */
+    private static CubeListBuilder box(boolean left, float width, float height)
+    {
+        CubeListBuilder builder = CubeListBuilder.create();
+        if (left)
+            builder.mirror();
+        float originX = left ? -width : 0.0F;
+        return builder.addBox(originX, -height * 0.5F, -0.5F, width, height, 1.0F);
+    }
+
+    /**
+     * Poses one side. {@code sign} must be +1 for the right side and -1 for the left (the Z-swing and roll axes
+     * are mirrored between sides; the pitch axis is not). Angles are in radians.
+     */
+    private void applyPose(boolean left,
+            float upperBaseZ, float upperMidZ, float upperTipZ,
+            float lowerBaseZ, float lowerTipZ, float pitch)
+    {
+        float sign = left ? -1.0F : 1.0F;
+        ModelPart upperBase = left ? leftUpperBase : rightUpperBase;
+        ModelPart upperMid = left ? leftUpperMid : rightUpperMid;
+        ModelPart upperTip = left ? leftUpperTip : rightUpperTip;
+        ModelPart lowerBase = left ? leftLowerBase : rightLowerBase;
+        ModelPart lowerTip = left ? leftLowerTip : rightLowerTip;
+
+        upperBase.zRot = sign * upperBaseZ;
+        upperBase.xRot = pitch;
+        upperMid.zRot = sign * upperMidZ;
+        upperTip.zRot = sign * upperTipZ;
+
+        lowerBase.zRot = sign * lowerBaseZ;
+        lowerBase.xRot = pitch;
+        lowerTip.zRot = sign * lowerTipZ;
+    }
+
+    public void setPose(float upperBaseZ, float upperMidZ, float upperTipZ,
+            float lowerBaseZ, float lowerTipZ, float pitch)
+    {
+        applyPose(false, upperBaseZ, upperMidZ, upperTipZ, lowerBaseZ, lowerTipZ, pitch);
+        applyPose(true, upperBaseZ, upperMidZ, upperTipZ, lowerBaseZ, lowerTipZ, pitch);
+    }
+
+    /** Lower wing renders first so the upper wing naturally stacks in front of it, per the fold reference. */
     public void renderToBuffer(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay)
     {
-        rightWingRoot.render(poseStack, buffer, packedLight, packedOverlay);
-        leftWingRoot.render(poseStack, buffer, packedLight, packedOverlay);
+        rightLowerBase.render(poseStack, buffer, packedLight, packedOverlay);
+        leftLowerBase.render(poseStack, buffer, packedLight, packedOverlay);
+        rightUpperBase.render(poseStack, buffer, packedLight, packedOverlay);
+        leftUpperBase.render(poseStack, buffer, packedLight, packedOverlay);
     }
-
-    private static float lerp(float t, float from, float to)
-    {
-        return from + (to - from) * t;
-    }
-
-    // Folded: wings swept back and tucked close against the spine.
-    private static final float FOLDED_ROOT_YAW = 1.1F;
-    private static final float FOLDED_ROOT_PITCH = 0.05F;
-    private static final float FOLDED_UPPER_PITCH = -0.2F;
-    private static final float FOLDED_LOWER_PITCH = 0.3F;
-
-    // Fully open: swept out to the side, upper wing angled up/out, lower wing angled slightly down.
-    private static final float OPEN_ROOT_YAW = 0.15F;
-    private static final float OPEN_ROOT_PITCH = -0.1F;
-    private static final float OPEN_UPPER_PITCH = -0.5F;
-    private static final float OPEN_LOWER_PITCH = 0.15F;
-
-    // Flap: downstroke (positive) then a slightly offset, smaller recovery stroke on the lower wing.
-    private static final float FLAP_AMPLITUDE_UPPER = 0.55F;
-    private static final float FLAP_AMPLITUDE_LOWER = 0.4F;
-    private static final float FLAP_ROLL_AMPLITUDE = 0.12F;
-    private static final float FLAP_LAG = 0.7F;
 }
