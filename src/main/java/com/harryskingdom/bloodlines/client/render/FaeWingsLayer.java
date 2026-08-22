@@ -19,6 +19,9 @@ import net.minecraft.world.item.ItemStack;
  * built from scratch. No Icarus item involved at all: Fae's flight is now fully native (see RaceFlightFood),
  * so this is gated purely on race. Rendered at WING_SCALE so they read as a dramatic wingspan rather than
  * getting lost against the (separately Pehkui-shrunk) Fae body.
+ * <p>
+ * fae_wings.png is Medieval Origins Revival's own pixie_wings.png (CC BY 4.0, credit muon-rw - see
+ * mods.toml's credits field for the required attribution), an interim placeholder pending commissioned art.
  */
 public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> extends ElytraLayer<T, M>
 {
