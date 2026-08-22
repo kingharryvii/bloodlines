@@ -72,10 +72,21 @@ public class FaeWingModel
     private static final float LOWER_OPEN_YAW = 0.1F;
     private static final float LOWER_OPEN_SWEEP = 0.2F;
 
+    // Every coordinate in this class (pivots, outline control points) is authored in the same "pixel" units
+    // Minecraft's own ModelPart/CubeListBuilder uses (e.g. the vanilla player body is 8 units wide). ModelPart
+    // converts that to real world-space size internally when it compiles a cuboid into vertices; since this
+    // class bypasses ModelPart entirely and pushes vertices straight into the PoseStack, that conversion has to
+    // happen explicitly here, or every coordinate renders 16x too large - which is exactly what "wings the size
+    // of a house, floating off the back" was: a pivot at x=4 rendering 4 *blocks* from the body instead of 1/4.
+    private static final float MODEL_UNITS_TO_BLOCKS = 1.0F / 16.0F;
+
     public void render(PoseStack poseStack, VertexConsumer buffer, int packedLight)
     {
+        poseStack.pushPose();
+        poseStack.scale(MODEL_UNITS_TO_BLOCKS, MODEL_UNITS_TO_BLOCKS, MODEL_UNITS_TO_BLOCKS);
         renderSide(poseStack, buffer, packedLight, false);
         renderSide(poseStack, buffer, packedLight, true);
+        poseStack.popPose();
     }
 
     private void renderSide(PoseStack poseStack, VertexConsumer buffer, int packedLight, boolean left)
