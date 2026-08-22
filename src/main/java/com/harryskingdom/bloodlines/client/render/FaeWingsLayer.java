@@ -31,7 +31,9 @@ import net.minecraft.world.item.ItemStack;
  * settled open pose (that's what "wings coming out of the head" was). Fixed by dropping that hard set entirely
  * and instead easing here, every frame, toward the same moderate open target Medieval Origins Revival's own
  * ElytraModelMixin uses - smooth and continuous instead of a periodic snap, and gated on actually flying so
- * idle/walking still settle toward vanilla's own small default.
+ * idle/walking still settle toward vanilla's own small default. The target itself oscillates (a sine wave on
+ * X/Z) for a real wingbeat while actively flying; OPEN_EASING is deliberately snappier than Medieval's own 0.1
+ * so the wing visibly tracks that oscillation instead of lagging behind it.
  * <p>
  * fae_wings.png is Medieval Origins Revival's own pixie_wings.png (CC BY 4.0, credit muon-rw - see
  * mods.toml's credits field for the required attribution), an interim placeholder pending commissioned art.
@@ -49,7 +51,11 @@ public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> ext
     private static final float OPEN_ELYTRA_ROT_X = 0.8981317F;
     private static final float OPEN_ELYTRA_ROT_Y = 0.58726646F;
     private static final float OPEN_ELYTRA_ROT_Z = -0.5F - (float) Math.PI / 4F;
-    private static final float OPEN_EASING = 0.1F;
+    private static final float OPEN_EASING = 0.25F;
+
+    private static final float FLAP_SPEED = 1.4F;
+    private static final float FLAP_AMPLITUDE_X = 0.35F;
+    private static final float FLAP_AMPLITUDE_Z = 0.2F;
 
     public FaeWingsLayer(RenderLayerParent<T, M> renderer, EntityModelSet modelSet)
     {
@@ -87,9 +93,10 @@ public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> ext
         if (entity instanceof AbstractClientPlayer player && player.getAbilities().flying
                 && ClientRaceCache.get(entity.getId()) == Race.FAE)
         {
-            player.elytraRotX += (OPEN_ELYTRA_ROT_X - player.elytraRotX) * OPEN_EASING;
+            float flap = (float) Math.sin(ageInTicks * FLAP_SPEED);
+            player.elytraRotX += (OPEN_ELYTRA_ROT_X + flap * FLAP_AMPLITUDE_X - player.elytraRotX) * OPEN_EASING;
             player.elytraRotY += (OPEN_ELYTRA_ROT_Y - player.elytraRotY) * OPEN_EASING;
-            player.elytraRotZ += (OPEN_ELYTRA_ROT_Z - player.elytraRotZ) * OPEN_EASING;
+            player.elytraRotZ += (OPEN_ELYTRA_ROT_Z + flap * FLAP_AMPLITUDE_Z - player.elytraRotZ) * OPEN_EASING;
         }
     }
 }
