@@ -54,11 +54,13 @@ public class BloodlinesClientEvents
 
     private static void updateFaeWingFlap(AbstractClientPlayer player)
     {
-        // Flying is handled by FaeWingsLayer's own per-frame easing instead of a hard set here - see its
-        // javadoc for why a tick-rate hard set fights vanilla's own per-frame easing and snaps to an extreme
-        // angle instead of settling naturally.
         if (player.getAbilities().flying)
+        {
+            player.elytraRotX = WINGS_SPREAD_X;
+            player.elytraRotY = WINGS_SPREAD_Y;
+            player.elytraRotZ = WINGS_SPREAD_Z;
             return;
+        }
 
         Vec3 movement = player.getDeltaMovement();
         if (movement.y < -0.5)
