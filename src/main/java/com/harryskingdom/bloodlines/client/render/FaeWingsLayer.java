@@ -23,7 +23,7 @@ import net.minecraft.world.item.ItemStack;
 public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> extends ElytraLayer<T, M>
 {
     private static final ResourceLocation TEXTURE = new ResourceLocation(BloodlinesMod.MODID, "textures/entity/fae_wings.png");
-    private static final float WING_SCALE = 1.8F;
+    private static final float WING_SCALE = 1.3F;
 
     public FaeWingsLayer(RenderLayerParent<T, M> renderer, EntityModelSet modelSet)
     {

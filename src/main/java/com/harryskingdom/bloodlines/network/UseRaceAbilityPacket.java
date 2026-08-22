@@ -73,16 +73,11 @@ public class UseRaceAbilityPacket
 
     private static void handleSecondary(ServerPlayer player, com.harryskingdom.bloodlines.race.Race race)
     {
+        // No race currently has a secondary ability - this is a stub for when one does.
         String secondaryName = RaceAbility.secondaryNameFor(race);
         if (secondaryName == null)
         {
             player.sendSystemMessage(Component.literal("This bloodline has no secondary ability.").withStyle(ChatFormatting.GRAY));
-            return;
         }
-
-        // Hover is the only secondary ability so far; free toggle, no cooldown.
-        RaceAbility.toggleHover(player);
-        String state = RaceAbility.isHovering(player) ? "engaged" : "disengaged";
-        player.sendSystemMessage(Component.literal(secondaryName + " " + state + ".").withStyle(ChatFormatting.AQUA));
     }
 }

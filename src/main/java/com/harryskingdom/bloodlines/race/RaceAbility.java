@@ -5,8 +5,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.Vec3;
 
 /** Each starting race's active, cooldown-gated special move. */
 public final class RaceAbility
@@ -41,14 +39,10 @@ public final class RaceAbility
         };
     }
 
-    /** Display name of this race's secondary ability, or null if it doesn't have one. */
+    /** Display name of this race's secondary ability, or null if it doesn't have one. None currently do. */
     public static String secondaryNameFor(Race race)
     {
-        return switch (race)
-        {
-            case FAE -> "Hover";
-            default -> null;
-        };
+        return null;
     }
 
     /** Triggers the race's ability effects on the player. Returns false if this race has no ability. */
@@ -118,44 +112,5 @@ public final class RaceAbility
     {
         for (MobEffectInstance effect : effects)
             player.addEffect(effect);
-    }
-
-    /**
-     * Fae's ability is a free toggle rather than a cooldown-gated burst: press to rise and hold position in the
-     * air via Levitation, press again to let go. Meant to complement their Icarus flight, not replace it.
-     */
-    public static boolean isHovering(ServerPlayer player)
-    {
-        return player.hasEffect(MobEffects.LEVITATION);
-    }
-
-    public static void toggleHover(ServerPlayer player)
-    {
-        if (isHovering(player))
-        {
-            player.removeEffect(MobEffects.LEVITATION);
-        }
-        else
-        {
-            player.addEffect(new MobEffectInstance(MobEffects.LEVITATION, 20 * 300, 0, false, false, true));
-            player.level().playSound(null, player.blockPosition(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 1f, 1.5f);
-        }
-    }
-
-    private static final double HOVER_VERTICAL_SPEED = 0.2;
-
-    /**
-     * Turns vanilla's one-way Levitation into an actual controllable hover: hold jump to rise, sneak to descend,
-     * release both to hold position. Runs identically on both sides each tick so client-side movement prediction
-     * for the local player agrees with the server, avoiding rubber-banding. jumpHeld is passed in explicitly
-     * rather than read off vanilla's own jumping field, since Icarus's flight input handling suppresses that
-     * field while a wing item is equipped.
-     */
-    public static void updateHoverMovement(Player player, boolean jumpHeld)
-    {
-        double vertical = jumpHeld ? HOVER_VERTICAL_SPEED : player.isShiftKeyDown() ? -HOVER_VERTICAL_SPEED : 0;
-        Vec3 motion = player.getDeltaMovement();
-        player.setDeltaMovement(motion.x, vertical, motion.z);
-        player.fallDistance = 0;
     }
 }

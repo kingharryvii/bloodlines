@@ -2,14 +2,11 @@ package com.harryskingdom.bloodlines.client;
 
 import com.harryskingdom.bloodlines.BloodlinesMod;
 import com.harryskingdom.bloodlines.network.BloodlinesNetwork;
-import com.harryskingdom.bloodlines.network.HoverInputPacket;
 import com.harryskingdom.bloodlines.network.UseRaceAbilityPacket;
 import com.harryskingdom.bloodlines.race.ClientRaceCache;
 import com.harryskingdom.bloodlines.race.Race;
-import com.harryskingdom.bloodlines.race.RaceAbility;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -32,8 +29,6 @@ public class BloodlinesClientEvents
     private static final float WINGS_SPREAD_Y = 0.58726646F;
     private static final float WINGS_SPREAD_Z = -0.5F - (float) Math.PI / 4F;
 
-    private static boolean lastSentJumping = false;
-
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event)
     {
@@ -50,18 +45,6 @@ public class BloodlinesClientEvents
         if (minecraft.level == null)
             return;
 
-        if (minecraft.player != null && minecraft.player.hasEffect(MobEffects.LEVITATION))
-        {
-            boolean jumping = minecraft.options.keyJump.isDown();
-            RaceAbility.updateHoverMovement(minecraft.player, jumping);
-
-            if (jumping != lastSentJumping)
-            {
-                BloodlinesNetwork.CHANNEL.sendToServer(new HoverInputPacket(jumping));
-                lastSentJumping = jumping;
-            }
-        }
-
         for (AbstractClientPlayer player : minecraft.level.players())
         {
             if (ClientRaceCache.get(player.getId()) == Race.FAE)
@@ -71,7 +54,7 @@ public class BloodlinesClientEvents
 
     private static void updateFaeWingFlap(AbstractClientPlayer player)
     {
-        if (player.getAbilities().flying || player.hasEffect(MobEffects.LEVITATION))
+        if (player.getAbilities().flying)
         {
             player.elytraRotX = WINGS_SPREAD_X;
             player.elytraRotY = WINGS_SPREAD_Y;

@@ -27,8 +27,6 @@ public final class BloodlinesNetwork
                 SelectRacePacket::encode, SelectRacePacket::decode, SelectRacePacket::handle);
         CHANNEL.registerMessage(id++, UseRaceAbilityPacket.class,
                 UseRaceAbilityPacket::encode, UseRaceAbilityPacket::decode, UseRaceAbilityPacket::handle);
-        CHANNEL.registerMessage(id++, HoverInputPacket.class,
-                HoverInputPacket::encode, HoverInputPacket::decode, HoverInputPacket::handle);
         CHANNEL.registerMessage(id++, SyncPlayerRacePacket.class,
                 SyncPlayerRacePacket::encode, SyncPlayerRacePacket::decode, SyncPlayerRacePacket::handle);
     }

@@ -88,9 +88,9 @@ public final class RaceEffects
         player.removeEffect(MobEffects.SLOW_FALLING);
         player.removeEffect(MobEffects.WATER_BREATHING);
         player.removeEffect(MobEffects.DOLPHINS_GRACE);
-        player.removeEffect(MobEffects.LEVITATION);
-        RaceHoverState.clear(player);
 
+        setMayFly(player, false);
+        RaceFlightResource.clear(player);
         PehkuiIntegration.resetScale(player);
         IcarusIntegration.removeWings(player);
     }

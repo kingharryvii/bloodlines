@@ -2,7 +2,6 @@ package com.harryskingdom.bloodlines.race;
 
 import com.harryskingdom.bloodlines.BloodlinesMod;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.MobType;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraftforge.event.TickEvent;
@@ -90,9 +89,6 @@ public class RaceEffectEvents
 
         if (!(event.player instanceof ServerPlayer player))
             return;
-
-        if (player.hasEffect(MobEffects.LEVITATION))
-            RaceAbility.updateHoverMovement(player, RaceHoverState.isJumping(player));
 
         withRace(player, race ->
         {
