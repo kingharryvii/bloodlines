@@ -23,11 +23,14 @@ import net.minecraft.world.item.ItemStack;
  * rig this class started as (also abandoned for the same reason: it didn't read as real wings in motion). No
  * Icarus item involved: flight is fully native (see SeraphFlightController), so this is gated purely on race.
  * <p>
- * Unlike Fae's free-running sine-wave flap, this drives elytraRotX/Y/Z from SeraphFlapTracker's actual discrete
- * flap events (the same one-shot fast-downstroke/slower-recovery envelope the original 4-wing rig used) - the
- * wings only move in response to a real flap, matching the "respond to the actual flap event, don't just
- * oscillate constantly" requirement from the flight spec. Works identically for the local player and every other
- * visible Seraph, since SeraphFlapTracker is kept in sync for both (see SyncSeraphFlapPacket).
+ * Two animation layers, both driving elytraRotX/Y/Z: a continuous automatic wingbeat that plays for the entire
+ * duration of flight (real reference footage - Icarus + Medieval Origins Revival's Valkyrie - confirmed the
+ * wings keep beating throughout flight, not just on a manual input; per-flight-tick control is a Bloodlines
+ * addition for lift, not something the wings should wait around for), plus a one-shot fast-downstroke/slower-
+ * recovery boost layered on top read from SeraphFlapTracker's actual flap events, so a real flap still reads as
+ * a stronger, distinct beat rather than blending invisibly into the ambient cycle. Works identically for the
+ * local player and every other visible Seraph, since SeraphFlapTracker is kept in sync for both (see
+ * SyncSeraphFlapPacket).
  */
 public class SeraphWingsLayer<T extends LivingEntity, M extends EntityModel<T>> extends ElytraLayer<T, M>
 {
@@ -39,9 +42,16 @@ public class SeraphWingsLayer<T extends LivingEntity, M extends EntityModel<T>> 
     private static final float OPEN_ELYTRA_ROT_Z = -0.5F - (float) Math.PI / 4F;
     private static final float OPEN_EASING = 0.25F;
 
-    private static final float FLAP_AMPLITUDE_X = 0.5F;
-    private static final float FLAP_AMPLITUDE_Z = 0.3F;
+    // Continuous ambient wingbeat, active for the whole flight - slower/more majestic than Fae's fast fairy
+    // flutter, matching a large powerful creature rather than an insect.
+    private static final float AUTO_FLAP_SPEED = 2.8F;
+    private static final float AUTO_FLAP_AMPLITUDE_X = 0.35F;
+    private static final float AUTO_FLAP_AMPLITUDE_Z = 0.2F;
 
+    // One-shot boost layered on top for an actual flap event, so a real flap still reads as a distinct, stronger
+    // beat rather than disappearing into the ambient cycle.
+    private static final float BOOST_AMPLITUDE_X = 0.3F;
+    private static final float BOOST_AMPLITUDE_Z = 0.15F;
     private static final float DOWNSTROKE_TICKS = 3.5F;
     private static final float RECOVERY_TICKS = 7.0F;
 
@@ -87,12 +97,14 @@ public class SeraphWingsLayer<T extends LivingEntity, M extends EntityModel<T>> 
 
             if (flying)
             {
-                float t = (float) SeraphFlapTracker.ticksSinceFlap(entity.getId()) + partialTicks;
-                float envelope = flapEnvelope(t);
+                float autoFlap = (float) Math.sin(ageInTicks * AUTO_FLAP_SPEED);
 
-                float targetX = OPEN_ELYTRA_ROT_X + envelope * FLAP_AMPLITUDE_X;
+                float t = (float) SeraphFlapTracker.ticksSinceFlap(entity.getId()) + partialTicks;
+                float boost = flapEnvelope(t);
+
+                float targetX = OPEN_ELYTRA_ROT_X + autoFlap * AUTO_FLAP_AMPLITUDE_X + boost * BOOST_AMPLITUDE_X;
                 float targetY = OPEN_ELYTRA_ROT_Y;
-                float targetZ = OPEN_ELYTRA_ROT_Z + envelope * FLAP_AMPLITUDE_Z;
+                float targetZ = OPEN_ELYTRA_ROT_Z + autoFlap * AUTO_FLAP_AMPLITUDE_Z + boost * BOOST_AMPLITUDE_Z;
 
                 player.elytraRotX += (targetX - player.elytraRotX) * OPEN_EASING;
                 player.elytraRotY += (targetY - player.elytraRotY) * OPEN_EASING;
