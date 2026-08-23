@@ -1,7 +1,6 @@
 package com.harryskingdom.bloodlines.race;
 
 import com.harryskingdom.bloodlines.BloodlinesMod;
-import com.harryskingdom.bloodlines.race.seraph.SeraphFlightFood;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.MobType;
 import net.minecraft.world.entity.projectile.AbstractArrow;
@@ -95,8 +94,6 @@ public class RaceEffectEvents
         {
             if (race == Race.FAE)
                 RaceFlightFood.tick(player);
-            else if (race == Race.SERAPH)
-                SeraphFlightFood.tick(player);
         });
     }
 

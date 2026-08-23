@@ -1,12 +1,9 @@
 package com.harryskingdom.bloodlines;
 
-import com.harryskingdom.bloodlines.config.SeraphFlightConfig;
 import com.harryskingdom.bloodlines.item.BloodlinesItems;
 import com.harryskingdom.bloodlines.network.BloodlinesNetwork;
 import com.mojang.logging.LogUtils;
-import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 
@@ -20,7 +17,6 @@ public class BloodlinesMod
     {
         BloodlinesNetwork.register();
         BloodlinesItems.register(context.getModEventBus());
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SeraphFlightConfig.SPEC);
         LOGGER.info("Harry's Kingdom: Bloodlines loaded successfully.");
     }
 }
