@@ -9,6 +9,7 @@ import com.harryskingdom.bloodlines.race.Race;
 import com.harryskingdom.bloodlines.race.seraph.SeraphFlightState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
@@ -32,10 +33,15 @@ import net.minecraftforge.fml.common.Mod;
  * to climb, look down to dive, look left/right to steer" falls out of this formula on its own, it isn't a
  * separate special case.
  * <p>
- * Flapping (jump key while airborne) is Bloodlines' own addition on top of that base: a direct upward+forward
- * impulse, cooldown-gated, so repeated controlled flaps let the player climb without diving first - real Icarus
- * has no equivalent, it's pure elytra-glide-plus-steering. Gliding (not holding forward) still gets a much
- * weaker steering nudge, so the player has some air control coasting on momentum instead of losing it entirely.
+ * On top of that, while thrusting forward the vertical steering target also gets a "base lift" term equal to
+ * whatever's needed to exactly cancel gravity at level (look.y=0) look angle - real wings generate lift from
+ * forward airspeed even flying level, so sustained forward flight shouldn't require constantly flapping just to
+ * not sink; flapping (jump key) is a burst on top of that for climbing faster or recovering altitude, not a
+ * requirement to stay airborne. Gliding (not holding forward) gets a much weaker steering nudge and no base
+ * lift, so momentum carries you but you do gradually sink, same as a real glide.
+ * <p>
+ * Activation is a double-tap of jump (matching vanilla elytra's own gesture and what players instinctively try),
+ * not a single press - a single press just lets vanilla's own jump happen normally.
  */
 @Mod.EventBusSubscriber(modid = BloodlinesMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class SeraphFlightController
@@ -45,9 +51,11 @@ public final class SeraphFlightController
     private static final double DESCENDING_THRESHOLD = -0.15;
     private static final long FLAPPING_STATE_WINDOW_TICKS = 6;
     private static final int TAKEOFF_STATE_TICKS = 8;
+    private static final long DOUBLE_TAP_WINDOW_TICKS = 10;
 
     private static boolean inFlight = false;
     private static boolean wasJumpDown = false;
+    private static long lastJumpPressTick = -1000;
     private static long takeoffStartedTick = 0;
     private static long lastFlapTick = 0;
     private static SeraphFlightState state = SeraphFlightState.GROUNDED;
@@ -89,9 +97,14 @@ public final class SeraphFlightController
         if (!inFlight)
         {
             if (jumpPressed)
-                beginFlight(player);
-            else
-                state = SeraphFlightState.GROUNDED;
+            {
+                long now = mc.level.getGameTime();
+                if (now - lastJumpPressTick <= DOUBLE_TAP_WINDOW_TICKS)
+                    beginFlight(player);
+                else
+                    lastJumpPressTick = now;
+            }
+            state = SeraphFlightState.GROUNDED;
             return;
         }
 
@@ -101,9 +114,10 @@ public final class SeraphFlightController
             return;
         }
 
+        double gravityThisTick = GRAVITY_PER_TICK * SeraphFlightConfig.FLIGHT_GRAVITY_MULTIPLIER.get();
         Vec3 velocity = player.getDeltaMovement();
         double x = velocity.x * DRAG;
-        double y = velocity.y - GRAVITY_PER_TICK * SeraphFlightConfig.FLIGHT_GRAVITY_MULTIPLIER.get();
+        double y = velocity.y - gravityThisTick;
         double z = velocity.z * DRAG;
 
         boolean thrusting = player.zza > 0 && foodAllows(player);
@@ -115,8 +129,12 @@ public final class SeraphFlightController
             blendRate *= SeraphFlightConfig.CLIMB_BOOST_MULTIPLIER.get();
 
         double targetSpeed = SeraphFlightConfig.LOOK_STEER_TARGET_SPEED.get();
+        // Exactly cancels gravityThisTick at the steady state where look.y=0, so level sustained flight doesn't
+        // bleed altitude - see class javadoc.
+        double baseLift = thrusting ? gravityThisTick * (1.0 - blendRate) / blendRate : 0.0;
+
         x += (look.x * targetSpeed - x) * blendRate;
-        y += (look.y * targetSpeed - y) * blendRate;
+        y += (look.y * targetSpeed + baseLift - y) * blendRate;
         z += (look.z * targetSpeed - z) * blendRate;
 
         if (jumpPressed && flapCooldownReady() && foodAllows(player))
@@ -182,6 +200,7 @@ public final class SeraphFlightController
         lastFlapTick = player.level().getGameTime();
         SeraphFlapTracker.recordFlap(player.getId());
         BloodlinesNetwork.CHANNEL.sendToServer(new SeraphFlapPacket());
+        player.displayClientMessage(Component.literal("Taking off!"), true);
     }
 
     private static void endFlight()
