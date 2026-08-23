@@ -49,7 +49,7 @@ public final class RaceEffects
         }
         else if (race == Race.SERAPH)
         {
-            IcarusIntegration.grantSeraphWings(player);
+            IcarusIntegration.removeWings(player);
             setMayFly(player, false);
             PehkuiIntegration.resetScale(player);
         }
