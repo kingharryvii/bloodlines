@@ -40,8 +40,14 @@ import net.minecraftforge.fml.common.Mod;
  * requirement to stay airborne. Gliding (not holding forward) gets a much weaker steering nudge and no base
  * lift, so momentum carries you but you do gradually sink, same as a real glide.
  * <p>
- * Activation is a double-tap of jump (matching vanilla elytra's own gesture and what players instinctively try),
- * not a single press - a single press just lets vanilla's own jump happen normally.
+ * Activation matches real vanilla elytra/Icarus exactly: jump while already airborne (not on ground). It is NOT
+ * a timed double-tap - a first attempt used a fixed window between two presses (e.g. 10 ticks) and that's what
+ * broke: a natural jump arc alone takes ~10-12 ticks, so someone jumping, watching to see if they're actually
+ * falling, then pressing again lands well outside any reasonable fixed window, and just reads as a normal jump.
+ * Real elytra has no such deadline - it only ever checks "is this entity currently off the ground", however long
+ * that's been true. A single normal jump from standing still already provides a brief airborne window a second
+ * press can land in, which is why it still feels like "double-tap jump" to a player even though the code has no
+ * timing logic at all.
  */
 @Mod.EventBusSubscriber(modid = BloodlinesMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class SeraphFlightController
@@ -51,11 +57,9 @@ public final class SeraphFlightController
     private static final double DESCENDING_THRESHOLD = -0.15;
     private static final long FLAPPING_STATE_WINDOW_TICKS = 6;
     private static final int TAKEOFF_STATE_TICKS = 8;
-    private static final long DOUBLE_TAP_WINDOW_TICKS = 10;
 
     private static boolean inFlight = false;
     private static boolean wasJumpDown = false;
-    private static long lastJumpPressTick = -1000;
     private static long takeoffStartedTick = 0;
     private static long lastFlapTick = 0;
     private static SeraphFlightState state = SeraphFlightState.GROUNDED;
@@ -96,14 +100,8 @@ public final class SeraphFlightController
 
         if (!inFlight)
         {
-            if (jumpPressed)
-            {
-                long now = mc.level.getGameTime();
-                if (now - lastJumpPressTick <= DOUBLE_TAP_WINDOW_TICKS)
-                    beginFlight(player);
-                else
-                    lastJumpPressTick = now;
-            }
+            if (jumpPressed && !player.onGround())
+                beginFlight(player);
             state = SeraphFlightState.GROUNDED;
             return;
         }

@@ -42,7 +42,10 @@ public record RaceStats(
             case DEMON -> new RaceStats(-2, 0.05, 2, 0, 0, 0.1, true, true, false, false, 0, 0, false, 0, false, 0);
             case TROLL -> new RaceStats(8, -0.15, 3, 0.2, 0, -0.15, false, false, false, false, 0.2, 0, false, 0, false, 0);
             case MERFOLK -> new RaceStats(0, -0.1, 0, 0, 1, 0, false, false, false, false, 0, 0, true, 0, false, 0);
-            case SERAPH -> new RaceStats(6, -0.1, 2, 0.15, 2, 0, false, true, false, false, -0.2, 0, false, 0, false, 0.6);
+            // noFallDamage=true: a flying race dying to fall damage (only had a 60% reduction before) defeats
+            // the point of having flight - matches Fae's own true immunity (via slowFalling) rather than being
+            // the odd one out among the flying/agile races.
+            case SERAPH -> new RaceStats(6, -0.1, 2, 0.15, 2, 0, false, true, false, true, -0.2, 0, false, 0, false, 0.6);
 
             // Dragonborn has no stats yet — designed alongside the Dragon Shrine unlock.
             default -> NONE;
