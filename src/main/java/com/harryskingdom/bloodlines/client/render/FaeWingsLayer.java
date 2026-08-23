@@ -51,7 +51,7 @@ public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> ext
     private static final float OPEN_ELYTRA_ROT_Z = -0.5F - (float) Math.PI / 4F;
     private static final float OPEN_EASING = 0.25F;
 
-    private static final float FLAP_SPEED = 6.0F;
+    private static final float FLAP_SPEED = 5.8F;
     private static final float FLAP_AMPLITUDE_X = 0.35F;
     private static final float FLAP_AMPLITUDE_Z = 0.2F;
 
