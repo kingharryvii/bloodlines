@@ -95,16 +95,23 @@ public final class SeraphFlightConfig
                 .defineInRange("climbBoostAngleDegrees", 15.0, 1.0, 90.0);
 
         PASSIVE_EXHAUSTION_PER_TICK = builder
-                .comment("Food exhaustion added per tick just for staying airborne, regardless of flapping.")
-                .defineInRange("passiveExhaustionPerTick", 0.01, 0.0, 1.0);
+                .comment("Food exhaustion added per tick just for staying airborne, regardless of flapping. " +
+                        "Matches Medieval Origins Revival's own Valkyrie race (medievalorigins:icarus_wings power, " +
+                        "which grants real Icarus wings with this exact exhaustion value) rather than Icarus's " +
+                        "own default of 0.03 - Valkyrie is tuned about 4x more forgiving.")
+                .defineInRange("passiveExhaustionPerTick", 0.0075, 0.0, 1.0);
 
         FLAP_EXHAUSTION_COST = builder
-                .comment("Additional food exhaustion added each time the player flaps.")
-                .defineInRange("flapExhaustionCost", 0.4, 0.0, 5.0);
+                .comment("Additional food exhaustion added each time the player flaps. No Icarus/Valkyrie " +
+                        "equivalent (manual flapping is Bloodlines' own addition), kept low since flapping is a " +
+                        "burst rather than a requirement.")
+                .defineInRange("flapExhaustionCost", 0.15, 0.0, 5.0);
 
         REQUIRED_FOOD_LEVEL = builder
-                .comment("Minimum food level required to take off or keep flapping. Icarus defaults to ~7.")
-                .defineInRange("requiredFoodLevel", 7, 0, 20);
+                .comment("Minimum food level required to take off or keep flapping. Valkyrie's own tuning is 0 " +
+                        "(no gate at all, just the passive drain) - kept at 1 here so literal starvation still " +
+                        "grounds the player, matching 'insufficient food eventually prevents flight'.")
+                .defineInRange("requiredFoodLevel", 1, 0, 20);
 
         ARMOR_AFFECTS_FLIGHT_SPEED = builder
                 .comment("If true, heavier armor slows flight speed (not yet wired to a specific formula - reserved for tuning).")
