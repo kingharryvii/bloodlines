@@ -18,6 +18,11 @@ public final class SeraphFlightConfig
     public static final ForgeConfigSpec.DoubleValue MAX_FLIGHT_SPEED;
     public static final ForgeConfigSpec.DoubleValue MAX_ASCENT_SPEED;
     public static final ForgeConfigSpec.DoubleValue FLIGHT_GRAVITY_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue LOOK_STEER_TARGET_SPEED;
+    public static final ForgeConfigSpec.DoubleValue LOOK_STEER_BLEND_RATE;
+    public static final ForgeConfigSpec.DoubleValue LOOK_STEER_GLIDE_BLEND_RATE;
+    public static final ForgeConfigSpec.DoubleValue CLIMB_BOOST_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue CLIMB_BOOST_ANGLE_DEGREES;
     public static final ForgeConfigSpec.DoubleValue PASSIVE_EXHAUSTION_PER_TICK;
     public static final ForgeConfigSpec.DoubleValue FLAP_EXHAUSTION_COST;
     public static final ForgeConfigSpec.IntValue REQUIRED_FOOD_LEVEL;
@@ -62,6 +67,32 @@ public final class SeraphFlightConfig
                 .comment("Fraction of vanilla's own fall-flying gravity that still applies while airborne as a " +
                         "Seraph (0 = float, 1 = full elytra-glide gravity). Lift from flaps counters the rest.")
                 .defineInRange("flightGravityMultiplier", 0.35, 0.0, 1.0);
+
+        LOOK_STEER_TARGET_SPEED = builder
+                .comment("Terminal speed (blocks/tick) velocity chases while thrusting, in whatever direction the " +
+                        "player is looking - the core of Icarus-style look-directed flight (player.getLookAngle() " +
+                        "scaled up, velocity eased toward it every tick).")
+                .defineInRange("lookSteerTargetSpeed", 0.9, 0.1, 5.0);
+
+        LOOK_STEER_BLEND_RATE = builder
+                .comment("Fraction of the way velocity closes toward lookSteerTargetSpeed each tick while holding " +
+                        "forward (thrusting). Icarus's own default is 0.0125, but that number only makes sense " +
+                        "alongside vanilla's separate elytra drag, which this standalone system doesn't have.")
+                .defineInRange("lookSteerBlendRate", 0.06, 0.001, 1.0);
+
+        LOOK_STEER_GLIDE_BLEND_RATE = builder
+                .comment("Same as lookSteerBlendRate but applied while NOT holding forward (gliding) - weaker, so " +
+                        "the player keeps some air control coasting on momentum without full thrust.")
+                .defineInRange("lookSteerGlideBlendRate", 0.02, 0.0, 1.0);
+
+        CLIMB_BOOST_MULTIPLIER = builder
+                .comment("Multiplies the steering blend rate when looking within climbBoostAngleDegrees of " +
+                        "straight up - Icarus's own 'power climb' when you look nearly vertical.")
+                .defineInRange("climbBoostMultiplier", 1.6, 1.0, 10.0);
+
+        CLIMB_BOOST_ANGLE_DEGREES = builder
+                .comment("How close to straight up (degrees) the player must be looking for the climb boost to apply.")
+                .defineInRange("climbBoostAngleDegrees", 15.0, 1.0, 90.0);
 
         PASSIVE_EXHAUSTION_PER_TICK = builder
                 .comment("Food exhaustion added per tick just for staying airborne, regardless of flapping.")

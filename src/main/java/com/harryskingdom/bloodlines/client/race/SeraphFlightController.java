@@ -9,6 +9,7 @@ import com.harryskingdom.bloodlines.race.Race;
 import com.harryskingdom.bloodlines.race.seraph.SeraphFlightState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
@@ -16,27 +17,33 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Seraph's flight controller: the "flight" half of the two connected systems the wing animation is built on top
- * of (see SeraphWingsLayer for the "wing animator" half, which only ever reads state this class produces - it
- * never drives physics itself). Runs client-side, local player only, since movement in this codebase is already
- * client-authoritative for both vanilla flight and Fae's native flight (the server trusts the resulting position
- * updates the same way it already does for creative/elytra flight).
+ * Seraph's flight controller (Stage 1 of the rebuild - see chat for the staged plan). Runs client-side, local
+ * player only, same client-authoritative movement this codebase already uses for vanilla flight and Fae's native
+ * flight. Owns physics and state ONLY; SeraphWingsLayer (currently still the ElytraLayer placeholder from the
+ * previous pass - the real 4-wing model is Stage 2+) only ever reads state from here, never drives it.
  * <p>
- * Deliberately does NOT hook real vanilla fall-flying (isFallFlying/DATA_SHARED_FLAGS_ID): there's no public API
- * to trigger it externally in 1.20.1 (the closest, LivingEntity.updateFallFlying, is private, and the shared-flag
- * accessor is protected), and reaching for a Mixin or Access Transformer just to borrow vanilla's hardcoded
- * gravity/drag numbers isn't worth it when every one of those numbers needs to be configurable anyway. Instead
- * this hand-rolls elytra-style physics (gravity, drag, look-direction steering) driven entirely by
- * SeraphFlightConfig, then layers jump-triggered flap impulses on top - "elytra movement + Icarus-style active
- * flapping" implemented directly rather than borrowed from vanilla's fixed formula.
+ * The core steering formula is a direct translation of Icarus's own (read from their actual 1.21.1 source,
+ * IcarusClient.onPlayerTick - not guessed): each tick, while holding forward, velocity eases toward
+ * {@code player.getLookAngle() * targetSpeed} at a configurable rate, with a stronger "power climb" rate when
+ * looking within a few degrees of straight up. Icarus's own constants (wingsSpeed=0.0125, target magnitude 2.5)
+ * only produce sane numbers because vanilla's own elytra drag is ALSO acting underneath that formula in real
+ * Icarus; since this is a fully standalone system with no vanilla fall-flying physics under it, the constants
+ * are retuned from scratch (see SeraphFlightConfig) while keeping the same structure - "look up + hold forward
+ * to climb, look down to dive, look left/right to steer" falls out of this formula on its own, it isn't a
+ * separate special case.
+ * <p>
+ * Flapping (jump key while airborne) is Bloodlines' own addition on top of that base: a direct upward+forward
+ * impulse, cooldown-gated, so repeated controlled flaps let the player climb without diving first - real Icarus
+ * has no equivalent, it's pure elytra-glide-plus-steering. Gliding (not holding forward) still gets a much
+ * weaker steering nudge, so the player has some air control coasting on momentum instead of losing it entirely.
  */
 @Mod.EventBusSubscriber(modid = BloodlinesMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class SeraphFlightController
 {
-    private static final double GRAVITY_PER_TICK = 0.08;
+    private static final double GRAVITY_PER_TICK = 0.06;
     private static final double DRAG = 0.98;
-    private static final double STEERING_STRENGTH = 0.08;
-    private static final long ACTIVE_FLIGHT_WINDOW_TICKS = 20;
+    private static final double DESCENDING_THRESHOLD = -0.15;
+    private static final long FLAPPING_STATE_WINDOW_TICKS = 6;
     private static final int TAKEOFF_STATE_TICKS = 8;
 
     private static boolean inFlight = false;
@@ -75,7 +82,7 @@ public final class SeraphFlightController
         if (ClientRaceCache.get(player.getId()) != Race.SERAPH)
         {
             if (inFlight)
-                endFlight(player);
+                endFlight();
             return;
         }
 
@@ -90,21 +97,28 @@ public final class SeraphFlightController
 
         if (player.onGround())
         {
-            endFlight(player);
+            endFlight();
             return;
         }
 
-        Vec3 movement = player.getDeltaMovement();
-        double x = movement.x * DRAG;
-        double y = movement.y - GRAVITY_PER_TICK * SeraphFlightConfig.FLIGHT_GRAVITY_MULTIPLIER.get();
-        double z = movement.z * DRAG;
+        Vec3 velocity = player.getDeltaMovement();
+        double x = velocity.x * DRAG;
+        double y = velocity.y - GRAVITY_PER_TICK * SeraphFlightConfig.FLIGHT_GRAVITY_MULTIPLIER.get();
+        double z = velocity.z * DRAG;
 
+        boolean thrusting = player.zza > 0 && foodAllows(player);
         Vec3 look = player.getLookAngle();
-        x += look.x * STEERING_STRENGTH;
-        y += look.y * STEERING_STRENGTH;
-        z += look.z * STEERING_STRENGTH;
+        double blendRate = thrusting ? SeraphFlightConfig.LOOK_STEER_BLEND_RATE.get() : SeraphFlightConfig.LOOK_STEER_GLIDE_BLEND_RATE.get();
 
-        boolean flapped = false;
+        float angleFromStraightUp = Mth.degreesDifferenceAbs(player.getXRot(), -90.0F);
+        if (angleFromStraightUp <= SeraphFlightConfig.CLIMB_BOOST_ANGLE_DEGREES.get())
+            blendRate *= SeraphFlightConfig.CLIMB_BOOST_MULTIPLIER.get();
+
+        double targetSpeed = SeraphFlightConfig.LOOK_STEER_TARGET_SPEED.get();
+        x += (look.x * targetSpeed - x) * blendRate;
+        y += (look.y * targetSpeed - y) * blendRate;
+        z += (look.z * targetSpeed - z) * blendRate;
+
         if (jumpPressed && flapCooldownReady() && foodAllows(player))
         {
             double forward = SeraphFlightConfig.FLAP_FORWARD_FORCE.get();
@@ -114,7 +128,6 @@ public final class SeraphFlightController
             z += look.z * forward;
 
             lastFlapTick = mc.level.getGameTime();
-            flapped = true;
             SeraphFlapTracker.recordFlap(player.getId());
             BloodlinesNetwork.CHANNEL.sendToServer(new SeraphFlapPacket());
         }
@@ -134,16 +147,23 @@ public final class SeraphFlightController
         player.setDeltaMovement(x, y, z);
         player.resetFallDistance();
 
-        long ticksSinceLastFlap = mc.level.getGameTime() - lastFlapTick;
-        if (state == SeraphFlightState.TAKEOFF)
-        {
-            if (mc.level.getGameTime() - takeoffStartedTick > TAKEOFF_STATE_TICKS)
-                state = SeraphFlightState.ACTIVE_FLIGHT;
-        }
+        updateState(mc.level.getGameTime(), y, thrusting);
+    }
+
+    private static void updateState(long gameTime, double verticalVelocity, boolean thrusting)
+    {
+        if (state == SeraphFlightState.TAKEOFF && gameTime - takeoffStartedTick <= TAKEOFF_STATE_TICKS)
+            return;
+
+        long ticksSinceFlap = gameTime - lastFlapTick;
+        if (ticksSinceFlap < FLAPPING_STATE_WINDOW_TICKS)
+            state = SeraphFlightState.FLAPPING;
+        else if (verticalVelocity < DESCENDING_THRESHOLD)
+            state = SeraphFlightState.DESCENDING;
+        else if (thrusting)
+            state = SeraphFlightState.ACTIVE_FLIGHT;
         else
-        {
-            state = ticksSinceLastFlap < ACTIVE_FLIGHT_WINDOW_TICKS ? SeraphFlightState.ACTIVE_FLIGHT : SeraphFlightState.GLIDE;
-        }
+            state = SeraphFlightState.GLIDING;
     }
 
     private static void beginFlight(LocalPlayer player)
@@ -164,7 +184,7 @@ public final class SeraphFlightController
         BloodlinesNetwork.CHANNEL.sendToServer(new SeraphFlapPacket());
     }
 
-    private static void endFlight(LocalPlayer player)
+    private static void endFlight()
     {
         inFlight = false;
         state = SeraphFlightState.LANDING;

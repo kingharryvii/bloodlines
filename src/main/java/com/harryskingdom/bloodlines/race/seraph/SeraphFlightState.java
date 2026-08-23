@@ -1,9 +1,11 @@
 package com.harryskingdom.bloodlines.race.seraph;
 
 /**
- * Seraph's flight state machine (see SeraphFlightController for the transitions, SeraphWingsLayer for how each
- * state poses the wings). FOLDED -> TAKEOFF -> ACTIVE_FLIGHT <-> GLIDE -> LANDING -> FOLDED, matching the
- * transition chain the wing animation is built around - no state change should ever visually snap.
+ * Seraph's flight state machine (see SeraphFlightController for the transitions). Both the physics and the wing
+ * animation read this - the physics decides it, the animation only ever reacts to it.
+ * <pre>
+ * GROUNDED -&gt; TAKEOFF -&gt; ACTIVE_FLIGHT/FLAPPING &lt;-&gt; GLIDING -&gt; DESCENDING -&gt; LANDING -&gt; GROUNDED
+ * </pre>
  */
 public enum SeraphFlightState
 {
@@ -11,10 +13,14 @@ public enum SeraphFlightState
     GROUNDED,
     /** The first moment of flight: wings spreading and the initial launch impulse playing out. */
     TAKEOFF,
-    /** Airborne and recently flapped - wings actively beating. */
+    /** Airborne, thrusting forward under look-directed power, not in the middle of a flap. */
     ACTIVE_FLIGHT,
-    /** Airborne but coasting - wings extended, only subtle movement. */
-    GLIDE,
+    /** A flap is actively playing out (the brief window right after a flap event). */
+    FLAPPING,
+    /** Airborne, coasting on momentum rather than thrusting - wings extended, minimal movement. */
+    GLIDING,
+    /** Airborne and losing altitude notably, not from a recent flap. */
+    DESCENDING,
     /** Just touched down from flight - wings easing from open back toward folded. */
     LANDING
 }
