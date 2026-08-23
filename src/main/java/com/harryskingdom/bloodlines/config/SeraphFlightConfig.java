@@ -1,0 +1,92 @@
+package com.harryskingdom.bloodlines.config;
+
+import net.minecraftforge.common.ForgeConfigSpec;
+
+/**
+ * Tunable values for Seraph's native flight (see SeraphFlightController/SeraphWingsLayer). Common config so both
+ * the client (local physics prediction) and server (food-cost/cooldown validation) read the same numbers.
+ */
+public final class SeraphFlightConfig
+{
+    public static final ForgeConfigSpec SPEC;
+
+    public static final ForgeConfigSpec.IntValue FLAP_COOLDOWN_TICKS;
+    public static final ForgeConfigSpec.DoubleValue FLAP_UPWARD_FORCE;
+    public static final ForgeConfigSpec.DoubleValue FLAP_FORWARD_FORCE;
+    public static final ForgeConfigSpec.DoubleValue TAKEOFF_UPWARD_FORCE;
+    public static final ForgeConfigSpec.DoubleValue TAKEOFF_FORWARD_FORCE;
+    public static final ForgeConfigSpec.DoubleValue MAX_FLIGHT_SPEED;
+    public static final ForgeConfigSpec.DoubleValue MAX_ASCENT_SPEED;
+    public static final ForgeConfigSpec.DoubleValue FLIGHT_GRAVITY_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue PASSIVE_EXHAUSTION_PER_TICK;
+    public static final ForgeConfigSpec.DoubleValue FLAP_EXHAUSTION_COST;
+    public static final ForgeConfigSpec.IntValue REQUIRED_FOOD_LEVEL;
+    public static final ForgeConfigSpec.BooleanValue ARMOR_AFFECTS_FLIGHT_SPEED;
+    public static final ForgeConfigSpec.BooleanValue INDEFINITE_FLIGHT;
+
+    static
+    {
+        ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
+
+        builder.comment("Seraph native flight tuning").push("seraph_flight");
+
+        FLAP_COOLDOWN_TICKS = builder
+                .comment("Ticks that must pass between wing flaps (20 ticks = 1 second).")
+                .defineInRange("flapCooldownTicks", 12, 1, 200);
+
+        FLAP_UPWARD_FORCE = builder
+                .comment("Upward velocity added by a single flap while airborne.")
+                .defineInRange("flapUpwardForce", 0.6, 0.0, 5.0);
+
+        FLAP_FORWARD_FORCE = builder
+                .comment("Forward velocity (along look direction) added by a single flap while airborne.")
+                .defineInRange("flapForwardForce", 0.35, 0.0, 5.0);
+
+        TAKEOFF_UPWARD_FORCE = builder
+                .comment("Upward velocity added by the initial takeoff flap from the ground.")
+                .defineInRange("takeoffUpwardForce", 0.75, 0.0, 5.0);
+
+        TAKEOFF_FORWARD_FORCE = builder
+                .comment("Forward velocity added by the initial takeoff flap from the ground.")
+                .defineInRange("takeoffForwardForce", 0.2, 0.0, 5.0);
+
+        MAX_FLIGHT_SPEED = builder
+                .comment("Horizontal speed cap (blocks/tick) while flying.")
+                .defineInRange("maxFlightSpeed", 1.2, 0.1, 10.0);
+
+        MAX_ASCENT_SPEED = builder
+                .comment("Vertical ascent speed cap (blocks/tick) while flying.")
+                .defineInRange("maxAscentSpeed", 0.5, 0.1, 5.0);
+
+        FLIGHT_GRAVITY_MULTIPLIER = builder
+                .comment("Fraction of vanilla's own fall-flying gravity that still applies while airborne as a " +
+                        "Seraph (0 = float, 1 = full elytra-glide gravity). Lift from flaps counters the rest.")
+                .defineInRange("flightGravityMultiplier", 0.35, 0.0, 1.0);
+
+        PASSIVE_EXHAUSTION_PER_TICK = builder
+                .comment("Food exhaustion added per tick just for staying airborne, regardless of flapping.")
+                .defineInRange("passiveExhaustionPerTick", 0.01, 0.0, 1.0);
+
+        FLAP_EXHAUSTION_COST = builder
+                .comment("Additional food exhaustion added each time the player flaps.")
+                .defineInRange("flapExhaustionCost", 0.4, 0.0, 5.0);
+
+        REQUIRED_FOOD_LEVEL = builder
+                .comment("Minimum food level required to take off or keep flapping. Icarus defaults to ~7.")
+                .defineInRange("requiredFoodLevel", 7, 0, 20);
+
+        ARMOR_AFFECTS_FLIGHT_SPEED = builder
+                .comment("If true, heavier armor slows flight speed (not yet wired to a specific formula - reserved for tuning).")
+                .define("armorAffectsFlightSpeed", false);
+
+        INDEFINITE_FLIGHT = builder
+                .comment("If true, Seraph can fly indefinitely regardless of food level (skips all food gating/exhaustion).")
+                .define("indefiniteFlight", false);
+
+        builder.pop();
+
+        SPEC = builder.build();
+    }
+
+    private SeraphFlightConfig() {}
+}

@@ -29,5 +29,9 @@ public final class BloodlinesNetwork
                 UseRaceAbilityPacket::encode, UseRaceAbilityPacket::decode, UseRaceAbilityPacket::handle);
         CHANNEL.registerMessage(id++, SyncPlayerRacePacket.class,
                 SyncPlayerRacePacket::encode, SyncPlayerRacePacket::decode, SyncPlayerRacePacket::handle);
+        CHANNEL.registerMessage(id++, SeraphFlapPacket.class,
+                SeraphFlapPacket::encode, SeraphFlapPacket::decode, SeraphFlapPacket::handle);
+        CHANNEL.registerMessage(id++, SyncSeraphFlapPacket.class,
+                SyncSeraphFlapPacket::encode, SyncSeraphFlapPacket::decode, SyncSeraphFlapPacket::handle);
     }
 }
