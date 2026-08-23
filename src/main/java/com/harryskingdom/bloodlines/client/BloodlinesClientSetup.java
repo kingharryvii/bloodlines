@@ -2,7 +2,6 @@ package com.harryskingdom.bloodlines.client;
 
 import com.harryskingdom.bloodlines.BloodlinesMod;
 import com.harryskingdom.bloodlines.client.render.FaeWingsLayer;
-import com.harryskingdom.bloodlines.client.render.SeraphWingModel;
 import com.harryskingdom.bloodlines.client.render.SeraphWingsLayer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraftforge.api.distmarker.Dist;
@@ -19,12 +18,6 @@ public class BloodlinesClientSetup
     {
         event.register(BloodlinesKeyMappings.USE_PRIMARY_ABILITY);
         event.register(BloodlinesKeyMappings.USE_SECONDARY_ABILITY);
-    }
-
-    @SubscribeEvent
-    public static void registerLayerDefinitions(EntityRenderersEvent.RegisterLayerDefinitions event)
-    {
-        event.registerLayerDefinition(SeraphWingModel.LAYER_LOCATION, SeraphWingModel::createBodyLayer);
     }
 
     @SubscribeEvent

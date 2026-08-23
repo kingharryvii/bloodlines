@@ -5,122 +5,100 @@ import com.harryskingdom.bloodlines.client.race.SeraphFlapTracker;
 import com.harryskingdom.bloodlines.client.race.SeraphFlightController;
 import com.harryskingdom.bloodlines.race.ClientRaceCache;
 import com.harryskingdom.bloodlines.race.Race;
-import com.harryskingdom.bloodlines.race.seraph.SeraphFlightState;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.geom.EntityModelSet;
+import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
-import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import net.minecraft.client.renderer.entity.layers.ElytraLayer;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.world.item.ItemStack;
 
 /**
- * The "wing animator" half of Seraph's flight system - reads state SeraphFlightController/SeraphFlapTracker
- * produce and poses the wings accordingly, but never touches physics itself. Works identically for the local
- * player and every other visible Seraph: the local player's own controller updates SeraphFlapTracker with zero
- * latency, and SyncSeraphFlapPacket keeps remote players' entries updated too, so this layer only ever needs to
- * read one shared source of truth regardless of whose wings it's drawing.
+ * Draws Seraph's wings - reuses vanilla's own ElytraLayer/ElytraModel with a custom texture, the same technique
+ * that ended up working for Fae after a custom model failed to look right, instead of the bespoke 4-wing cuboid
+ * rig this class started as (also abandoned for the same reason: it didn't read as real wings in motion). No
+ * Icarus item involved: flight is fully native (see SeraphFlightController), so this is gated purely on race.
  * <p>
- * Two independent animation layers, matching the "wing behavior" spec exactly:
- * <ol>
- * <li>A smoothed open/fold amount (0=folded flat against the back, 1=fully spread) that alone covers the
- * take-off/landing transitions - there's no separate takeoff/landing animation because easing this value toward
- * its target already produces one.</li>
- * <li>A per-flap envelope: a one-shot asymmetric curve (fast downstroke, slower recovery) that plays out once
- * per real flap event read from SeraphFlapTracker, not a free-running oscillator - the wings only move when a
- * flap actually happened, with the lower wings evaluating the same curve on a short delay behind the uppers.</li>
- * </ol>
+ * Unlike Fae's free-running sine-wave flap, this drives elytraRotX/Y/Z from SeraphFlapTracker's actual discrete
+ * flap events (the same one-shot fast-downstroke/slower-recovery envelope the original 4-wing rig used) - the
+ * wings only move in response to a real flap, matching the "respond to the actual flap event, don't just
+ * oscillate constantly" requirement from the flight spec. Works identically for the local player and every other
+ * visible Seraph, since SeraphFlapTracker is kept in sync for both (see SyncSeraphFlapPacket).
  */
-public class SeraphWingsLayer<T extends LivingEntity, M extends EntityModel<T>> extends RenderLayer<T, M>
+public class SeraphWingsLayer<T extends LivingEntity, M extends EntityModel<T>> extends ElytraLayer<T, M>
 {
     private static final ResourceLocation TEXTURE = new ResourceLocation(BloodlinesMod.MODID, "textures/entity/seraph_wings.png");
+    private static final float WING_SCALE = 1.5F;
 
-    private static final float OPEN_SMOOTHING = 0.12F;
+    private static final float OPEN_ELYTRA_ROT_X = 0.8981317F;
+    private static final float OPEN_ELYTRA_ROT_Y = 0.58726646F;
+    private static final float OPEN_ELYTRA_ROT_Z = -0.5F - (float) Math.PI / 4F;
+    private static final float OPEN_EASING = 0.25F;
 
-    // Rest pose while folded (grounded/idle) - Z sweeps from "outward" toward "down the spine".
-    private static final float FOLD_UPPER_BASE = 1.3F;
-    private static final float FOLD_UPPER_TIP = -0.15F;
-    private static final float FOLD_LOWER_BASE = 1.45F;
-    private static final float FOLD_LOWER_TIP = 0.1F;
-
-    // Rest pose while airborne, before any flap offset is added.
-    private static final float OPEN_UPPER_BASE = -0.05F;
-    private static final float OPEN_UPPER_TIP = -0.25F;
-    private static final float OPEN_LOWER_BASE = 0.25F;
-    private static final float OPEN_LOWER_TIP = 0.15F;
-
-    // Added on top of the open pose, scaled by the flap envelope (0..1).
-    private static final float FLAP_UPPER_BASE = 0.55F;
-    private static final float FLAP_UPPER_TIP = 0.45F;
-    private static final float FLAP_LOWER_BASE = 0.4F;
-    private static final float FLAP_LOWER_TIP = 0.35F;
-    private static final float FLAP_PITCH = 0.15F;
+    private static final float FLAP_AMPLITUDE_X = 0.5F;
+    private static final float FLAP_AMPLITUDE_Z = 0.3F;
 
     private static final float DOWNSTROKE_TICKS = 3.5F;
     private static final float RECOVERY_TICKS = 7.0F;
-    private static final float LOWER_WING_DELAY_TICKS = 2.0F;
 
-    /** How long after landing (no controller, no recent flap) a remote player's wings still read as "open". */
+    /** How long after landing (no recent flap) a remote player's wings still read as "open". */
     private static final long GROUNDED_LINGER_TICKS = 10;
-
-    private static final Map<Integer, Float> OPEN_AMOUNT = new ConcurrentHashMap<>();
-
-    private final SeraphWingModel model;
 
     public SeraphWingsLayer(RenderLayerParent<T, M> renderer, EntityModelSet modelSet)
     {
-        super(renderer);
-        this.model = new SeraphWingModel(modelSet.bakeLayer(SeraphWingModel.LAYER_LOCATION));
+        super(renderer, modelSet);
+    }
+
+    @Override
+    public boolean shouldRender(ItemStack stack, T entity)
+    {
+        return ClientRaceCache.get(entity.getId()) == Race.SERAPH;
+    }
+
+    @Override
+    public ResourceLocation getElytraTexture(ItemStack stack, T entity)
+    {
+        return TEXTURE;
     }
 
     @Override
     public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight, T entity,
             float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch)
     {
-        if (ClientRaceCache.get(entity.getId()) != Race.SERAPH || entity.isInvisible())
-            return;
+        poseStack.pushPose();
+        poseStack.translate(0, entity.getBbHeight() * 0.5, 0);
+        poseStack.scale(WING_SCALE, WING_SCALE, WING_SCALE);
+        poseStack.translate(0, -entity.getBbHeight() * 0.5, 0);
+        super.render(poseStack, buffer, packedLight, entity, limbSwing, limbSwingAmount, partialTicks, ageInTicks, netHeadYaw, headPitch);
+        poseStack.popPose();
 
-        boolean isLocalPlayer = Minecraft.getInstance().player == entity;
-        boolean flying = isLocalPlayer
-                ? SeraphFlightController.isInFlight()
-                : (!entity.onGround() || SeraphFlapTracker.ticksSinceFlap(entity.getId()) < GROUNDED_LINGER_TICKS);
-
-        float target = flying ? 1.0F : 0.0F;
-        float openAmount = OPEN_AMOUNT.getOrDefault(entity.getId(), 0.0F);
-        openAmount += (target - openAmount) * OPEN_SMOOTHING;
-        OPEN_AMOUNT.put(entity.getId(), openAmount);
-
-        float upperBase = lerp(openAmount, FOLD_UPPER_BASE, OPEN_UPPER_BASE);
-        float upperTip = lerp(openAmount, FOLD_UPPER_TIP, OPEN_UPPER_TIP);
-        float lowerBase = lerp(openAmount, FOLD_LOWER_BASE, OPEN_LOWER_BASE);
-        float lowerTip = lerp(openAmount, FOLD_LOWER_TIP, OPEN_LOWER_TIP);
-        float pitch = 0.0F;
-
-        if (flying)
+        // Runs after super.render() so this frame's already-rendered pose isn't touched - only the next frame's
+        // starting point is nudged, matching vanilla's own ElytraModel.setupAnim easing timing.
+        if (entity instanceof AbstractClientPlayer player && ClientRaceCache.get(entity.getId()) == Race.SERAPH)
         {
-            float upperT = (float) SeraphFlapTracker.ticksSinceFlap(entity.getId()) + partialTicks;
-            float lowerT = upperT - LOWER_WING_DELAY_TICKS;
-            float upperEnvelope = flapEnvelope(upperT);
-            float lowerEnvelope = flapEnvelope(lowerT);
+            boolean isLocalPlayer = Minecraft.getInstance().player == player;
+            boolean flying = isLocalPlayer
+                    ? SeraphFlightController.isInFlight()
+                    : (!entity.onGround() || SeraphFlapTracker.ticksSinceFlap(entity.getId()) < GROUNDED_LINGER_TICKS);
 
-            upperBase += upperEnvelope * FLAP_UPPER_BASE;
-            upperTip += upperEnvelope * FLAP_UPPER_TIP;
-            lowerBase += lowerEnvelope * FLAP_LOWER_BASE;
-            lowerTip += lowerEnvelope * FLAP_LOWER_TIP;
-            pitch = upperEnvelope * FLAP_PITCH;
+            if (flying)
+            {
+                float t = (float) SeraphFlapTracker.ticksSinceFlap(entity.getId()) + partialTicks;
+                float envelope = flapEnvelope(t);
+
+                float targetX = OPEN_ELYTRA_ROT_X + envelope * FLAP_AMPLITUDE_X;
+                float targetY = OPEN_ELYTRA_ROT_Y;
+                float targetZ = OPEN_ELYTRA_ROT_Z + envelope * FLAP_AMPLITUDE_Z;
+
+                player.elytraRotX += (targetX - player.elytraRotX) * OPEN_EASING;
+                player.elytraRotY += (targetY - player.elytraRotY) * OPEN_EASING;
+                player.elytraRotZ += (targetZ - player.elytraRotZ) * OPEN_EASING;
+            }
         }
-
-        model.setPose(upperBase, upperTip, lowerBase, lowerTip, pitch);
-
-        VertexConsumer vertexConsumer = buffer.getBuffer(RenderType.entityTranslucent(TEXTURE));
-        model.renderToBuffer(poseStack, vertexConsumer, packedLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY);
     }
 
     /**
@@ -150,16 +128,5 @@ public class SeraphWingsLayer<T extends LivingEntity, M extends EntityModel<T>> 
     private static float easeInOutQuad(float t)
     {
         return t < 0.5F ? 2.0F * t * t : 1.0F - (float) Math.pow(-2.0 * t + 2.0, 2.0) / 2.0F;
-    }
-
-    private static float lerp(float t, float from, float to)
-    {
-        return from + (to - from) * t;
-    }
-
-    /** Drops the smoothed animation state for a player that's gone (logout, race change cleanup, etc). */
-    public static void clearState(int entityId)
-    {
-        OPEN_AMOUNT.remove(entityId);
     }
 }
