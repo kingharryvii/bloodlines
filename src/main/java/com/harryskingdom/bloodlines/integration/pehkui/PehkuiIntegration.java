@@ -15,6 +15,14 @@ import virtuoel.pehkui.util.ScaleUtils;
 public final class PehkuiIntegration
 {
     private static final float FAE_SCALE = 0.66f;
+    /** Height-only, per the user's own ask - a shorter, stouter silhouette without also narrowing the frame. */
+    private static final float DWARF_HEIGHT_SCALE = 0.85f;
+    /**
+     * Taller AND wider - height-only initially read as too lanky/stretched for "ancient giant"; width now comes
+     * along too, but more modestly than height so the shape reads as bulky rather than just uniformly scaled up.
+     */
+    private static final float TROLL_HEIGHT_SCALE = 1.2f;
+    private static final float TROLL_WIDTH_SCALE = 1.15f;
 
     private PehkuiIntegration() {}
 
@@ -41,6 +49,23 @@ public final class PehkuiIntegration
 
         setScale(ScaleTypes.HEIGHT.getScaleData(player), FAE_SCALE);
         setScale(ScaleTypes.WIDTH.getScaleData(player), FAE_SCALE);
+    }
+
+    public static void applyDwarfScale(ServerPlayer player)
+    {
+        if (!isLoaded())
+            return;
+
+        setScale(ScaleTypes.HEIGHT.getScaleData(player), DWARF_HEIGHT_SCALE);
+    }
+
+    public static void applyTrollScale(ServerPlayer player)
+    {
+        if (!isLoaded())
+            return;
+
+        setScale(ScaleTypes.HEIGHT.getScaleData(player), TROLL_HEIGHT_SCALE);
+        setScale(ScaleTypes.WIDTH.getScaleData(player), TROLL_WIDTH_SCALE);
     }
 
     public static void resetScale(ServerPlayer player)

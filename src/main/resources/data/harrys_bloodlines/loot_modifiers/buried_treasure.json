@@ -1,0 +1,10 @@
+{
+  "type": "harrys_bloodlines:orb_of_origin",
+  "conditions": [
+    {
+      "condition": "forge:loot_table_id",
+      "loot_table_id": "minecraft:chests/buried_treasure"
+    }
+  ],
+  "chance": 0.03
+}

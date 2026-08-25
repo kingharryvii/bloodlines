@@ -13,9 +13,6 @@ import net.minecraft.client.renderer.entity.layers.ElytraLayer;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -40,22 +37,37 @@ import net.minecraft.world.phys.Vec3;
  * WING_SCALE deliberately does NOT compensate for Pehkui's body shrink (tried that, wings ended up too tiny -
  * the user wants the "too-big-for-a-tiny-fairy" look, not a proportionally-shrunk one) - it's a fixed constant
  * tuned by eye instead.
+ * <p>
+ * WING_SCALE (1.33 -> 1.1) and OPEN_ELYTRA_ROT_Y (0.587 -> 0.35 -> 0.18, roughly 33.6 degrees down to 20 down
+ * to ~10) all trimmed back per user feedback that the two wing halves read as visibly separate pieces rather
+ * than one cohesive wing set - confirmed still gapped from directly overhead even after the first Y-spread
+ * cut, so cut again - less outward Y-spread keeps them closer together at rest, and the smaller overall scale
+ * keeps that closer pair from looking oversized once they're not spread as far apart.
  */
 public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> extends ElytraLayer<T, M>
 {
     private static final ResourceLocation TEXTURE = new ResourceLocation(BloodlinesMod.MODID, "textures/entity/fae_wings.png");
-    private static final float WING_SCALE = 1.4F;
+    private static final float WING_SCALE = 1.1F;
+    /**
+     * Scaling around the vertical center of the whole bounding box (0.5) dragged the wing base away from the
+     * actual shoulder attachment as it enlarged - "wings touching the back, then another pair floating apart"
+     * in testing, since scaling around a point well below the shoulder pushes anything above that point (the
+     * wings) further from it. 0.8 sits close to where vanilla's own ElytraModel actually attaches, so scaling
+     * around it barely moves the base at all - only the tips spread out, which is the effect actually wanted.
+     */
+    private static final float SCALE_PIVOT_FRACTION = 0.8F;
 
     private static final float OPEN_ELYTRA_ROT_X = 0.8981317F;
-    private static final float OPEN_ELYTRA_ROT_Y = 0.58726646F;
+    private static final float OPEN_ELYTRA_ROT_Y = 0.18F;
     private static final float OPEN_ELYTRA_ROT_Z = -0.5F - (float) Math.PI / 4F;
     private static final float OPEN_EASING = 0.25F;
 
-    private static final float FLAP_SPEED = 5.8F;
+    private static final float FLAP_SPEED = 5.2F;
     private static final float FLAP_AMPLITUDE_X = 0.35F;
     private static final float FLAP_AMPLITUDE_Z = 0.2F;
 
-    private static final double GROUND_DISTANCE_THRESHOLD = 0.1;
+    /** Baseline flap strength whenever airborne at all, so standing still in midair still visibly flaps. */
+    private static final float IDLE_AIRBORNE_FLAP_STRENGTH = 0.5F;
 
     public FaeWingsLayer(RenderLayerParent<T, M> renderer, EntityModelSet modelSet)
     {
@@ -79,9 +91,9 @@ public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> ext
             float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch)
     {
         poseStack.pushPose();
-        poseStack.translate(0, entity.getBbHeight() * 0.5, 0);
+        poseStack.translate(0, entity.getBbHeight() * SCALE_PIVOT_FRACTION, 0);
         poseStack.scale(WING_SCALE, WING_SCALE, WING_SCALE);
-        poseStack.translate(0, -entity.getBbHeight() * 0.5, 0);
+        poseStack.translate(0, -entity.getBbHeight() * SCALE_PIVOT_FRACTION, 0);
         super.render(poseStack, buffer, packedLight, entity, limbSwing, limbSwingAmount, partialTicks, ageInTicks, netHeadYaw, headPitch);
         poseStack.popPose();
 
@@ -105,24 +117,24 @@ public class FaeWingsLayer<T extends LivingEntity, M extends EntityModel<T>> ext
         }
     }
 
-    /** 0 if not jumping/falling/gliding fast enough to warrant a flap, otherwise how strongly to flap (0..1). */
+    /**
+     * 0 if standing on the ground or plummeting too fast to look right, otherwise how strongly to flap (0..1).
+     * Used to gate requiring active horizontal/vertical movement to flap at all, which meant a Fae standing
+     * still in midair - e.g. just drifting down under their own always-on slow falling, not pressing any
+     * movement key - never flapped. Airborne-and-not-falling-hard is now enough on its own; movement only
+     * scales the flap up from a gentle idle baseline rather than gating whether it happens at all.
+     */
     private static float fallFlapStrength(AbstractClientPlayer player)
     {
+        if (player.onGround())
+            return 0;
+
         Vec3 movement = player.getDeltaMovement();
         if (movement.y < -0.5)
             return 0;
 
         double normalizedY = movement.y * 2.5;
         double speedMagnitude = Math.sqrt(movement.x * movement.x + movement.z * movement.z + Math.max(normalizedY, 0) * Math.max(normalizedY, 0)) * 4;
-        float flapStrength = (float) Math.min(speedMagnitude, 1.0);
-
-        Vec3 start = player.position();
-        Vec3 end = start.add(0, -1, 0);
-        BlockHitResult hit = player.level().clip(new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
-        boolean closeToGround = hit.getType() != HitResult.Type.MISS && hit.getLocation().distanceTo(start) <= GROUND_DISTANCE_THRESHOLD;
-
-        boolean shouldFlap = player.isFallFlying() || normalizedY > 0.1
-                || (!closeToGround && (Math.abs(movement.x) + Math.abs(movement.z) > 0.1));
-        return shouldFlap ? flapStrength : 0;
+        return (float) Math.min(Math.max(speedMagnitude, IDLE_AIRBORNE_FLAP_STRENGTH), 1.0);
     }
 }

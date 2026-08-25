@@ -11,6 +11,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -18,7 +19,9 @@ import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.server.ServerLifecycleHooks;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -44,21 +47,58 @@ public class PlayerRaceEvents
         }
     }
 
+    /**
+     * A snapshot of the dying player's race data, taken from LivingDeathEvent - well before PlayerList#respawn()
+     * ever runs, since Entity#remove() (called on the old player mid-respawn, before the new one even exists)
+     * unconditionally calls invalidateCaps(). By the time PlayerEvent.Clone actually fires - inside
+     * ServerPlayer#restoreFrom(), itself called after the old player has already been discarded - the ORIGINAL
+     * player's own capability is already invalidated, so event.getOriginal().getCapability(...) silently
+     * resolves to nothing and the old onPlayerClone (which read straight from that live capability) quietly did
+     * NOTHING on every single death: no race copied to the new player, no RaceEffects.apply() call, no client
+     * resync. That's what was behind "died and lost my abilities/water breathing" - not a fluke from mid-edit
+     * testing (the original hypothesis when this was first reported), a real bug hit on every death. Confirmed
+     * by decompiling PlayerList#respawn() and Entity#remove() directly, not guessed: removePlayerImmediately()
+     * (which reaches Entity#remove()) runs before restoreFrom() in respawn()'s own body. Capturing the data
+     * here, before any of that invalidation happens, and consuming it in onPlayerClone instead of touching
+     * event.getOriginal()'s capability at all sidesteps the timing issue entirely.
+     */
+    private record RaceSnapshot(Race race, Set<Race> unlockedRaces) {}
+
+    private static final Map<UUID, RaceSnapshot> deathSnapshots = new ConcurrentHashMap<>();
+
+    @SubscribeEvent
+    public static void onDeath(LivingDeathEvent event)
+    {
+        if (!(event.getEntity() instanceof ServerPlayer player))
+            return;
+
+        PlayerRaceCapability.get(player).ifPresent(data ->
+                data.getRace().ifPresent(race ->
+                        deathSnapshots.put(player.getUUID(), new RaceSnapshot(race, EnumSet.copyOf(data.getUnlockedRaces())))));
+    }
+
     @SubscribeEvent
     public static void onPlayerClone(PlayerEvent.Clone event)
     {
         if (!event.isWasDeath())
             return;
 
-        event.getOriginal().getCapability(PlayerRaceCapability.PLAYER_RACE).ifPresent(oldData ->
-                event.getEntity().getCapability(PlayerRaceCapability.PLAYER_RACE).ifPresent(newData ->
-                {
-                    oldData.getRace().ifPresent(newData::setRace);
-                    oldData.getUnlockedRaces().forEach(newData::unlockRace);
+        RaceSnapshot snapshot = deathSnapshots.remove(event.getOriginal().getUUID());
+        if (snapshot == null)
+            return;
 
-                    if (event.getEntity() instanceof ServerPlayer newPlayer)
-                        newData.getRace().ifPresent(race -> RaceEffects.apply(newPlayer, race));
-                }));
+        event.getEntity().getCapability(PlayerRaceCapability.PLAYER_RACE).ifPresent(newData ->
+        {
+            newData.setRace(snapshot.race());
+            snapshot.unlockedRaces().forEach(newData::unlockRace);
+
+            if (event.getEntity() instanceof ServerPlayer newPlayer)
+            {
+                RaceEffects.apply(newPlayer, snapshot.race());
+                BloodlinesNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> newPlayer),
+                        new SyncPlayerRacePacket(newPlayer.getId(), snapshot.race()));
+            }
+        });
     }
 
     // Curios used to sync equipped wing items to observers for free; race isn't backed by an item any more, so

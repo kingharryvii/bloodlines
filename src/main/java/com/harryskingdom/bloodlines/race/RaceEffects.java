@@ -40,26 +40,38 @@ public final class RaceEffects
         setInnateEffect(player, MobEffects.SLOW_FALLING, stats.slowFalling());
         setInnateEffect(player, MobEffects.WATER_BREATHING, stats.aquatic());
         setInnateEffect(player, MobEffects.DOLPHINS_GRACE, stats.aquatic());
+        // Beastkin only - a sure-footed, climbing-adjacent nod. There's no clean "can climb walls" stat to add
+        // to RaceStats for this, so it's a direct race check rather than a new field just one race would ever use.
+        setInnateEffect(player, MobEffects.JUMP, race == Race.BEASTKIN);
 
+        // Angelkin/Demonkin need no grant call here at all any more - IcarusWingHooks makes Icarus think they
+        // have wings purely off their race, no real Curios item involved (see that class for why: a real item
+        // used to collide with Curios' shared "back" slot against backpacks and other back-slot gear). removeWings
+        // below is purely legacy cleanup, for any leftover real item from before that change.
         if (race == Race.FAE)
         {
             IcarusIntegration.removeWings(player);
             setMayFly(player, true);
             PehkuiIntegration.applyFaeScale(player);
         }
-        else if (race == Race.SERAPH)
-        {
-            IcarusIntegration.removeWings(player);
-            setMayFly(player, false);
-            PehkuiIntegration.resetScale(player);
-        }
         else
         {
             IcarusIntegration.removeWings(player);
             setMayFly(player, false);
-            PehkuiIntegration.resetScale(player);
+
+            if (race == Race.DWARF)
+                PehkuiIntegration.applyDwarfScale(player);
+            else if (race == Race.TROLL)
+                PehkuiIntegration.applyTrollScale(player);
+            else
+                PehkuiIntegration.resetScale(player);
         }
     }
+
+    /** Vanilla's own Abilities() constructor default - restored whenever our own granted flight is revoked. */
+    private static final float DEFAULT_FLYING_SPEED = 0.05F;
+    /** A bit slower than vanilla creative flight, per user feedback that Fae's flight felt a little too fast. */
+    private static final float FAE_FLYING_SPEED = 0.042F;
 
     /** Never touches mayfly/flying for an actually-creative or spectator player - only ever grants/revokes our own. */
     private static void setMayFly(ServerPlayer player, boolean mayFly)
@@ -68,6 +80,7 @@ public final class RaceEffects
             return;
 
         player.getAbilities().mayfly = mayFly;
+        player.getAbilities().setFlyingSpeed(mayFly ? FAE_FLYING_SPEED : DEFAULT_FLYING_SPEED);
         if (!mayFly)
             player.getAbilities().flying = false;
         player.onUpdateAbilities();
@@ -87,6 +100,7 @@ public final class RaceEffects
         player.removeEffect(MobEffects.SLOW_FALLING);
         player.removeEffect(MobEffects.WATER_BREATHING);
         player.removeEffect(MobEffects.DOLPHINS_GRACE);
+        player.removeEffect(MobEffects.JUMP);
 
         setMayFly(player, false);
         PehkuiIntegration.resetScale(player);

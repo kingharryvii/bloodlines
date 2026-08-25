@@ -8,6 +8,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
+import net.minecraftforge.network.PacketDistributor;
 
 import java.util.function.Supplier;
 
@@ -65,6 +66,7 @@ public class UseRaceAbilityPacket
                 {
                     RaceAbilityCooldowns.markUsed(player);
                     player.sendSystemMessage(Component.literal(abilityName + "!").withStyle(ChatFormatting.AQUA));
+                    BloodlinesNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new AbilityActivatedPacket());
                 }
             }));
         });

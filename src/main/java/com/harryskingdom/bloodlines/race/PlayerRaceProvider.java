@@ -46,14 +46,28 @@ public class PlayerRaceProvider implements ICapabilitySerializable<CompoundTag>
     @Override
     public void deserializeNBT(CompoundTag tag)
     {
+        // Race.valueOf throws for a saved constant that no longer exists (e.g. a removed race) - fall back to
+        // "no race chosen" for that one entry instead of crashing the player's data load entirely.
         if (tag.contains("Race"))
-            playerRace.setRace(Race.valueOf(tag.getString("Race")));
+            tryParseRace(tag.getString("Race")).ifPresent(playerRace::setRace);
 
         if (tag.contains("Unlocked"))
         {
             ListTag unlocked = tag.getList("Unlocked", Tag.TAG_STRING);
             for (int i = 0; i < unlocked.size(); i++)
-                playerRace.unlockRace(Race.valueOf(unlocked.getString(i)));
+                tryParseRace(unlocked.getString(i)).ifPresent(playerRace::unlockRace);
+        }
+    }
+
+    private static java.util.Optional<Race> tryParseRace(String name)
+    {
+        try
+        {
+            return java.util.Optional.of(Race.valueOf(name));
+        }
+        catch (IllegalArgumentException e)
+        {
+            return java.util.Optional.empty();
         }
     }
 }

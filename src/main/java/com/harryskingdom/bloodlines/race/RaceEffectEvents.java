@@ -1,13 +1,19 @@
 package com.harryskingdom.bloodlines.race;
 
 import com.harryskingdom.bloodlines.BloodlinesMod;
-import com.harryskingdom.bloodlines.race.seraph.SeraphFlightFood;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.MobType;
 import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.item.ArmorMaterials;
+import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.event.entity.living.LivingEquipmentChangeEvent;
 import net.minecraftforge.event.entity.living.LivingFallEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -82,6 +88,44 @@ public class RaceEffectEvents
         });
     }
 
+    /**
+     * "Need for Mobility" - Angelkin and Demonkin can't wear armor heavier than chainmail (wings need freedom of
+     * movement). Reacts to the equip rather than blocking it outright, same technique used by every other "race
+     * can't use X" mod: LivingEquipmentChangeEvent fires after the swap already happened, so a disallowed piece
+     * gets immediately handed back and the slot cleared, not prevented up front. "Heavier than chainmail" is
+     * measured directly off the item's own defense value for its slot against chainmail's, not a hardcoded
+     * material list, so it also catches modded armor without needing to know about it.
+     */
+    @SubscribeEvent
+    public static void onEquipmentChange(LivingEquipmentChangeEvent event)
+    {
+        if (!(event.getEntity() instanceof ServerPlayer player))
+            return;
+
+        if (event.getSlot().getType() != EquipmentSlot.Type.ARMOR)
+            return;
+
+        ItemStack equipped = event.getTo();
+        if (!(equipped.getItem() instanceof ArmorItem armor))
+            return;
+
+        withRace(player, race ->
+        {
+            if (race != Race.SERAPH && race != Race.DEMON)
+                return;
+
+            if (armor.getDefense() <= ArmorMaterials.CHAIN.getDefenseForType(armor.getType()))
+                return;
+
+            player.setItemSlot(event.getSlot(), ItemStack.EMPTY);
+            if (!player.getInventory().add(equipped))
+                player.drop(equipped, false);
+
+            player.sendSystemMessage(Component.literal("You need freedom of movement - you can't wear armor heavier than chainmail.")
+                    .withStyle(ChatFormatting.RED));
+        });
+    }
+
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent event)
     {
@@ -95,8 +139,6 @@ public class RaceEffectEvents
         {
             if (race == Race.FAE)
                 RaceFlightFood.tick(player);
-            else if (race == Race.SERAPH)
-                SeraphFlightFood.tick(player);
         });
     }
 

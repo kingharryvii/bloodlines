@@ -10,21 +10,20 @@ public enum Race
     HIGH_ELF(Tier.UNCOMMON, "High Elf", "Old magical nobility, sharper of mind than of blade.", false, null),
     MOON_ELF(Tier.UNCOMMON, "Moon Elf", "Night-blooded wanderers, most at home under a dark sky.", false, null),
     DWARF(Tier.COMMON, "Dwarf", "Masters of stone and tunnel, born knowing the weight of the earth.", false, null),
-    ORC(Tier.COMMON, "Orc", "Brute strength and endurance, favoring the axe over the book.", false, null),
     FAE(Tier.UNCOMMON, "Fae", "Small and touched by old magic, with delicate wings built for true flight — though even Fae wings tire.", false, null),
-    FELINE(Tier.UNCOMMON, "Feline", "Swift hunters who never fear the fall.", false, null),
     GOBLIN(Tier.UNCOMMON, "Goblin", "Underground tricksters, quick of hand and quicker to flee.", false, null),
 
     DRAGONBORN(Tier.RARE, "Dragonborn", "Blood-kin to dragons, and by extension, to the Crown itself.", true,
             "Discover the Dragon Shrine and awaken the blood of House Vaelharys."),
-    BEASTKIN(Tier.UNCOMMON, "Beastkin", "Animal-blooded folk whose senses and strength answer to the moon.", false, null),
+    // Absorbed the old Feline race (agility, claws, never fearing the fall) - the two kits overlapped enough
+    // that keeping them separate was redundant rather than distinct.
+    BEASTKIN(Tier.RARE, "Beastkin", "Animal-blooded folk, swift and strong, whose senses and instincts answer to the moon.", false, null),
     REVENANT(Tier.RARE, "Revenant", "A corpse that would not stay in the ground, and hungers for what it lost.", false, null),
-    LICH(Tier.RARE, "Lich", "A caster who traded their body for undying power, and paid for it.", false, null),
     GHOUL(Tier.RARE, "Ghoul", "Undead and unfeeling, built to endure what mortals cannot.", false, null),
-    DEMON(Tier.RARE, "Demon", "Infernal blood runs hot — fire given a mortal shape.", false, null),
+    DEMON(Tier.RARE, "Demonkin", "Infernal blood runs hot — fire given a mortal shape.", false, null),
     TROLL(Tier.RARE, "Troll", "Ancient giants who shrug off wounds that would kill anyone else.", false, null),
     MERFOLK(Tier.RARE, "Merfolk", "Sea-born people, as deadly in the depths as they are graceful.", false, null),
-    SERAPH(Tier.RARE, "Seraph", "Winged and towering, radiant with a light that isn't always kind.", false, null);
+    SERAPH(Tier.RARE, "Angelkin", "Winged and towering, radiant with a light that isn't always kind.", false, null);
 
     private final Tier tier;
     private final String displayName;

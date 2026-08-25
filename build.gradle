@@ -1,3 +1,14 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        // Only used by the convertMcpToSrgLegacy task below, to feed Mixin AP 0.8.5 (which wants the older
+        // plain-text SRG format) from ForgeGradle's own tsrg2 output - unrelated to the Forge/MC dependency.
+        classpath 'net.minecraftforge:srgutils:0.4.15'
+    }
+}
+
 plugins {
     id 'eclipse'
     id 'idea'
@@ -148,15 +159,38 @@ dependencies {
     // Soft integration with Pehkui (entity scaling), optional at runtime, for making Fae smaller/daintier.
     compileOnly files('libs/Pehkui-3.8.2+1.20.1-forge.jar')
 
-    // Soft integration with Icarus + Curios: Seraph gets a real Icarus wing item auto-equipped into their
-    // Curios "back" slot, so Icarus's own flight/stamina/animation code runs natively for them - no custom
-    // flight logic of our own. Icarus itself also needs Caelus, ResourcefulConfig and CommonNetworking at
-    // runtime (not needed at compile time here since we never reference their classes directly). Icarus
-    // Rewinged is optional on top of that, purely for a nicer reskinned wing texture when present. Fae does
-    // NOT use this - their flight is fully native (see RaceFlightResource).
+    // Soft integration with Icarus + Curios: Angelkin/Demonkin flight runs on Icarus's own real flight/stamina/
+    // animation code, with no real item ever equipped into Curios (see IcarusWingHooks - a real equipped item
+    // used to collide with anything else using the shared "back" slot, like backpacks/capes). Icarus itself also
+    // needs Caelus, ResourcefulConfig and CommonNetworking at runtime (not needed at compile time here since we
+    // never reference their classes directly). Fae does NOT use this - their flight is fully native (see
+    // RaceFlightFood).
     compileOnly files('libs/Icarus-Forge-2.14.0.jar')
     compileOnly files('libs/curios-forge-5.14.1+1.20.1.jar')
-    compileOnly files('libs/icarusrewinged-1.1.4-1.20.1-forge.jar')
+
+    // Mixin, isolated to the single Merfolk swim-rotation fix in mixin/MerfolkSwimRotationMixin - see that
+    // class's own doc comment for why (matching the real MerMod mod's own technique, which needed hooking a
+    // point no plain Forge event exposes). Nothing else in this mod uses Mixin. (A second use was attempted for
+    // a Fae flying-limb-freeze feature and abandoned - the injection never fired at runtime despite the refmap,
+    // bytecode call chain, and require=1 injector validation all checking out correctly, down to a bare
+    // log-only injection into a guaranteed-called method still not firing even after a clean rebuild. Root
+    // cause was never found; not worth the time against a purely cosmetic feature.)
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+// Mixin AP 0.8.5 wants the older plain-text SRG format for -AreobfSrgFile, but ForgeGradle's own createMcpToSrg
+// only produces tsrg2. This converts it once per build, purely for that annotation processor input - has no
+// effect on anything else in the build.
+tasks.register('convertMcpToSrgLegacy') {
+    dependsOn 'createMcpToSrg'
+    def input = tasks.named('createMcpToSrg').get().output
+    def output = layout.buildDirectory.file('createMcpToSrg/output.srg')
+    inputs.file(input)
+    outputs.file(output)
+    doLast {
+        def srg = net.minecraftforge.srgutils.IMappingFile.load(input.get().asFile)
+        srg.write(output.get().asFile.toPath(), net.minecraftforge.srgutils.IMappingFile.Format.SRG, false)
+    }
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
@@ -217,4 +251,15 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+tasks.named('compileJava', JavaCompile).configure {
+    dependsOn 'convertMcpToSrgLegacy'
+    def srgFile = layout.buildDirectory.file('createMcpToSrg/output.srg')
+    def refMapFile = layout.buildDirectory.file('resources/main/mixins.harrys_bloodlines.refmap.json')
+    inputs.file(srgFile)
+    options.compilerArgs += [
+            "-AreobfSrgFile=${srgFile.get().asFile.absolutePath}",
+            "-AoutRefMapFile=${refMapFile.get().asFile.absolutePath}"
+    ]
 }

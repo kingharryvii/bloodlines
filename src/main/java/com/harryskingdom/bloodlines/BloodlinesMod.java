@@ -1,12 +1,12 @@
 package com.harryskingdom.bloodlines;
 
-import com.harryskingdom.bloodlines.config.SeraphFlightConfig;
+import com.harryskingdom.bloodlines.integration.icarus.IcarusWingHooks;
 import com.harryskingdom.bloodlines.item.BloodlinesItems;
+import com.harryskingdom.bloodlines.loot.BloodlinesLootModifiers;
 import com.harryskingdom.bloodlines.network.BloodlinesNetwork;
 import com.mojang.logging.LogUtils;
-import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 
@@ -20,7 +20,11 @@ public class BloodlinesMod
     {
         BloodlinesNetwork.register();
         BloodlinesItems.register(context.getModEventBus());
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SeraphFlightConfig.SPEC);
-        LOGGER.info("Harry's Kingdom: Bloodlines loaded successfully.");
+        BloodlinesLootModifiers.register(context.getModEventBus());
+        // Runs after Icarus's own FMLCommonSetupEvent handler sets its real hasWings/getEquippedWings values -
+        // mods.toml declares ordering="AFTER" on the icarus dependency specifically so this is guaranteed, not
+        // just likely (see IcarusWingHooks for why the order matters).
+        context.getModEventBus().addListener((FMLCommonSetupEvent event) -> IcarusWingHooks.install());
+        LOGGER.info("Bloodlines loaded successfully.");
     }
 }

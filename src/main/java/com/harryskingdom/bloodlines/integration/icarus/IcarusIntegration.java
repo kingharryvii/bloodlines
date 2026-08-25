@@ -6,11 +6,13 @@ import net.minecraftforge.fml.ModList;
 import top.theillusivec4.curios.api.CuriosApi;
 
 /**
- * Soft integration with Curios, now used only to strip the real Icarus wing item from any player who was granted
- * one under the old Seraph flight system (before it moved to fully native flight/wings, see
- * SeraphFlightController and SeraphWingsLayer). Neither Fae nor Seraph grant a real Icarus item anymore - Fae's
- * flight was already fully native (see RaceFlightFood), and Seraph's now is too, so this class no longer grants
- * anything, only cleans up leftovers. No-ops entirely if Curios isn't installed.
+ * Legacy cleanup only. Angelkin/Demonkin flight no longer grants a real Icarus wing item at all - see
+ * IcarusWingHooks, which makes Icarus's own flight code think a player has wings purely off their Bloodlines
+ * race, with no physical item anywhere. That replaced an earlier version of
+ * this class which DID equip a real item into Curios' "back" slot, which turned out to collide with any other
+ * mod also using "back" (backpacks, capes, etc.) - a player couldn't wear both. removeWings here just strips any
+ * leftover real item a player might still have equipped from that earlier system, on worlds that predate this
+ * migration. No-ops entirely if Curios isn't installed.
  */
 public final class IcarusIntegration
 {
@@ -23,7 +25,7 @@ public final class IcarusIntegration
         return ModList.get().isLoaded("curios");
     }
 
-    /** Removes the racial wings if the player is currently wearing a pair we gave them under the old system. */
+    /** Removes the racial wings if the player is currently wearing a leftover pair from the old item-based system. */
     public static void removeWings(ServerPlayer player)
     {
         if (!isLoaded())

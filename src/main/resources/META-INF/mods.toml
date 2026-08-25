@@ -30,7 +30,7 @@ displayName="${mod_name}" #mandatory
 # A file name (in the root of the mod JAR) containing a logo for display
 #logoFile="examplemod.png" #optional
 # A text field displayed in the mod UI
-credits="Fae wing texture and flap animation adapted from Medieval Origins Revival by muon-rw (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/)" #optional
+credits="Fae wing texture and flap animation adapted from Medieval Origins Revival by muon-rw (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/). Merfolk tail texture adapted from Aino's Mermod Mermaid Tail Retexture." #optional
 # A text field displayed in the mod UI
 authors="${mod_authors}" #optional
 # Display Test controls the display for your mod in the server connection screen
@@ -73,7 +73,7 @@ description='''${mod_description}'''
     ordering="AFTER"
     side="BOTH"
 
-# Optional soft dependencies for the Icarus flight integration (Fae racial wings). The mod works fine without either.
+# Optional soft dependencies for the Icarus flight integration (Seraph racial wings). The mod works fine without either.
 [[dependencies.${mod_id}]]
     modId="icarus"
     mandatory=false
@@ -86,15 +86,14 @@ description='''${mod_description}'''
     versionRange="[5.0,)"
     ordering="AFTER"
     side="BOTH"
-[[dependencies.${mod_id}]]
-    modId="icarusrewinged"
-    mandatory=false
-    versionRange="[1.0,)"
-    ordering="AFTER"
-    side="BOTH"
 
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.
 #[features.${mod_id}]
 #openGLVersion="[3.2,)"
+
+# Isolated to the single Merfolk swim-rotation fix (see mixin/MerfolkSwimRotationMixin's own doc comment).
+# Nothing else in this mod uses Mixin - removing this one line and the mixin config/class fully reverts it.
+[[mixins]]
+config="mixins.harrys_bloodlines.json"

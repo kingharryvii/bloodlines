@@ -1,6 +1,6 @@
 {
   "parent": "item/generated",
   "textures": {
-    "layer0": "minecraft:item/ender_pearl"
+    "layer0": "harrys_bloodlines:item/orb_of_origin"
   }
 }
