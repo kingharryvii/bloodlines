@@ -52,6 +52,7 @@ public final class RacePowers
                     new RacePower("Featherfall", "Never takes fall damage - drifts down gently instead.", NEUTRAL),
                     new RacePower("Lucky Dust", "+2 luck.", POSITIVE),
                     new RacePower("Hollow Bones", "-6 max health, -1 melee damage - the frailest bloodline.", NEGATIVE),
+                    new RacePower("Need for Mobility", "Armor restrictions apply - wings need freedom of movement.", NEGATIVE),
                     new RacePower("Nature's Blessing", "Ability: regeneration for you and nearby allies.", NEUTRAL)
             )),
             Map.entry(Race.GOBLIN, List.of(
@@ -89,7 +90,7 @@ public final class RacePowers
                     new RacePower("Infernal Might", "+2 melee damage, +10% attack speed, +2 max health.", POSITIVE),
                     new RacePower("Nightsight", "Full night vision.", NEUTRAL),
                     new RacePower("Sure Wings", "Takes 60% less fall damage.", POSITIVE),
-                    new RacePower("Need for Mobility", "Can't wear armor heavier than chainmail.", NEGATIVE),
+                    new RacePower("Need for Mobility", "Armor restrictions apply - wings need freedom of movement.", NEGATIVE),
                     new RacePower("Infernal Wrath", "Ability: a damage boost for you and nearby allies, plus a burst of speed for you.", NEUTRAL)
             )),
             Map.entry(Race.TROLL, List.of(
@@ -111,7 +112,7 @@ public final class RacePowers
                     new RacePower("Protective Wings", "Takes 60% less fall damage.", POSITIVE),
                     new RacePower("Holy Vigor", "+4 max health, +2 melee damage, +2 luck.", POSITIVE),
                     new RacePower("Heavy of Wing", "-10% movement speed, -20% mining speed.", NEGATIVE),
-                    new RacePower("Need for Mobility", "Can't wear armor heavier than chainmail.", NEGATIVE),
+                    new RacePower("Need for Mobility", "Armor restrictions apply - wings need freedom of movement.", NEGATIVE),
                     new RacePower("Divine Descent", "Ability: heals you and nearby allies, plus a jump, damage boost and shield for you.", NEUTRAL)
             )),
             Map.entry(Race.DRAGONBORN, List.of(

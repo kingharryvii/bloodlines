@@ -87,18 +87,33 @@ public class PlayerRaceEvents
         if (snapshot == null)
             return;
 
+        // Only copy the capability data here - do NOT call RaceEffects.apply()/send the sync packet yet. This
+        // handler runs inside ServerPlayer#restoreFrom(), which fires well before PlayerList#respawn() sends
+        // ClientboundRespawnPacket. That packet tears down the client's LocalPlayer and builds a fresh one with
+        // default (non-flying) Abilities; any abilities packet we send before it is applied to the soon-to-be-
+        // discarded old client player and never resynced, so granting Fae's mayfly here silently never reaches
+        // the client (server-side state ends up correct, which is why this looked like a client-only glitch).
+        // onPlayerRespawn below does the actual RaceEffects.apply(), since PlayerRespawnEvent fires later in the
+        // same respawn() call, after the client's new player object already exists.
         event.getEntity().getCapability(PlayerRaceCapability.PLAYER_RACE).ifPresent(newData ->
         {
             newData.setRace(snapshot.race());
             snapshot.unlockedRaces().forEach(newData::unlockRace);
-
-            if (event.getEntity() instanceof ServerPlayer newPlayer)
-            {
-                RaceEffects.apply(newPlayer, snapshot.race());
-                BloodlinesNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> newPlayer),
-                        new SyncPlayerRacePacket(newPlayer.getId(), snapshot.race()));
-            }
         });
+    }
+
+    @SubscribeEvent
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event)
+    {
+        if (!(event.getEntity() instanceof ServerPlayer player))
+            return;
+
+        PlayerRaceCapability.get(player).ifPresent(data -> data.getRace().ifPresent(race ->
+        {
+            RaceEffects.apply(player, race);
+            BloodlinesNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                    new SyncPlayerRacePacket(player.getId(), race));
+        }));
     }
 
     // Curios used to sync equipped wing items to observers for free; race isn't backed by an item any more, so

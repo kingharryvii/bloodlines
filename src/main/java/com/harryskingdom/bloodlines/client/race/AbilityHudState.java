@@ -25,14 +25,14 @@ public final class AbilityHudState
     public static float cooldownProgress()
     {
         long elapsed = clientTick() - activatedAtTick;
-        return Mth.clamp(elapsed / (float) RaceAbility.COOLDOWN_TICKS, 0F, 1F);
+        return Mth.clamp(elapsed / (float) RaceAbility.cooldownTicks(), 0F, 1F);
     }
 
     /** 1 = just activated (full duration remaining), 0 = the effect has worn off. */
     public static float durationProgress()
     {
         long elapsed = clientTick() - activatedAtTick;
-        return 1F - Mth.clamp(elapsed / (float) RaceAbility.DURATION_TICKS, 0F, 1F);
+        return 1F - Mth.clamp(elapsed / (float) RaceAbility.durationTicks(), 0F, 1F);
     }
 
     private static long clientTick()

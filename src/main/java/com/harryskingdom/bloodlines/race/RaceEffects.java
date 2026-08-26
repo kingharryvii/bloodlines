@@ -1,5 +1,6 @@
 package com.harryskingdom.bloodlines.race;
 
+import com.harryskingdom.bloodlines.config.BloodlinesConfig;
 import com.harryskingdom.bloodlines.integration.icarus.IcarusIntegration;
 import com.harryskingdom.bloodlines.integration.pehkui.PehkuiIntegration;
 import net.minecraft.server.level.ServerPlayer;
@@ -70,8 +71,6 @@ public final class RaceEffects
 
     /** Vanilla's own Abilities() constructor default - restored whenever our own granted flight is revoked. */
     private static final float DEFAULT_FLYING_SPEED = 0.05F;
-    /** A bit slower than vanilla creative flight, per user feedback that Fae's flight felt a little too fast. */
-    private static final float FAE_FLYING_SPEED = 0.042F;
 
     /** Never touches mayfly/flying for an actually-creative or spectator player - only ever grants/revokes our own. */
     private static void setMayFly(ServerPlayer player, boolean mayFly)
@@ -80,7 +79,7 @@ public final class RaceEffects
             return;
 
         player.getAbilities().mayfly = mayFly;
-        player.getAbilities().setFlyingSpeed(mayFly ? FAE_FLYING_SPEED : DEFAULT_FLYING_SPEED);
+        player.getAbilities().setFlyingSpeed(mayFly ? BloodlinesConfig.FAE_FLYING_SPEED.get().floatValue() : DEFAULT_FLYING_SPEED);
         if (!mayFly)
             player.getAbilities().flying = false;
         player.onUpdateAbilities();

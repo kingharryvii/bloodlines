@@ -6,10 +6,11 @@ and the non-obvious lessons learned building it, so none of that has to be redis
 
 ## Where everything lives
 
-- **Project root**: `F:\Minecraft Development\Harrys Kingdom\Bloodlines` (moved here after a machine
-  change; the repo was previously at `D:\Minecraft Development\Harrys Kingdom\Bloodlines` on the old
-  PC — if you see that old path referenced anywhere outside git history, it's stale).
-- **Git data**: `F:\Minecraft Development\Harrys Kingdom\Bloodlines\.git` (hidden folder, created by
+- **Project root**: `D:\Minecraft Development\Harrys Kingdom\Bloodlines` (moved back here; it had
+  briefly lived at `F:\Minecraft Development\Harrys Kingdom\Bloodlines` after an earlier machine
+  change, but that F: copy no longer exists — if you see the F: path referenced anywhere outside git
+  history, it's stale).
+- **Git data**: `D:\Minecraft Development\Harrys Kingdom\Bloodlines\.git` (hidden folder, created by
   `git init` inside the project root — nothing special needs to be copied separately, the whole
   project folder *is* the repo).
 - **GitHub remote**: `origin` → `https://github.com/kingharryvii/bloodlines.git`, `master` tracks

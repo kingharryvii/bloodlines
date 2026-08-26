@@ -131,6 +131,7 @@ public class BloodlineSelectScreen extends Screen
         drawCardFrame(graphics, race);
         drawHeader(graphics, race);
         int bodyTop = drawDescription(graphics, race);
+        bodyTop = drawArmorNote(graphics, race, bodyTop);
         drawPowerList(graphics, race, bodyTop, mouseX, mouseY);
 
         super.render(graphics, mouseX, mouseY, partialTick);
@@ -235,6 +236,23 @@ public class BloodlineSelectScreen extends Screen
         }
 
         return y + PADDING / 2;
+    }
+
+    /**
+     * A short, always-visible caveat (unlike the scrollable power list below it, which a player may never scroll
+     * down to) for the winged races whose flight comes with an armor-weight cap. Kept deliberately generic
+     * rather than naming a specific material - the actual cap is admin-configurable (see BloodlinesConfig /
+     * RaceEffectEvents), so a hardcoded "no heavier than chainmail" claim here would go stale the moment a server
+     * changes it.
+     */
+    private int drawArmorNote(GuiGraphics graphics, Race race, int y)
+    {
+        if (race != Race.SERAPH && race != Race.DEMON && race != Race.FAE)
+            return y;
+
+        graphics.drawString(this.font, Component.literal("⚠ Armor restrictions may apply").withStyle(ChatFormatting.YELLOW),
+                cardX + PADDING, y, 0xFFFFFF);
+        return y + this.font.lineHeight + PADDING / 2;
     }
 
     private void drawPowerList(GuiGraphics graphics, Race race, int bodyTop, int mouseX, int mouseY)

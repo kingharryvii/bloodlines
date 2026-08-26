@@ -14,8 +14,8 @@ import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 /**
  * Two small bars next to the hotbar for the local player's racial ability, at the user's request - modeled on
  * Medieval Origins Revival's own ability HUD. The top bar is the cooldown: empty the instant you use it, fills
- * left-to-right as RaceAbility.COOLDOWN_TICKS elapses, full again once ready. The bottom bar is the active
- * duration: full the instant you use it, drains to empty over RaceAbility.DURATION_TICKS - only relevant while
+ * left-to-right as RaceAbility.cooldownTicks() elapses, full again once ready. The bottom bar is the active
+ * duration: full the instant you use it, drains to empty over RaceAbility.durationTicks() - only relevant while
  * the ability's effects are actually still ticking, so it's hidden once it hits zero rather than sitting there
  * permanently empty.
  */

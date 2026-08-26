@@ -55,9 +55,9 @@ public class UseRaceAbilityPacket
                     return;
                 }
 
-                if (!RaceAbilityCooldowns.isReady(player, RaceAbility.COOLDOWN_TICKS))
+                if (!RaceAbilityCooldowns.isReady(player, RaceAbility.cooldownTicks()))
                 {
-                    int seconds = RaceAbilityCooldowns.ticksRemaining(player, RaceAbility.COOLDOWN_TICKS) / 20;
+                    int seconds = RaceAbilityCooldowns.ticksRemaining(player, RaceAbility.cooldownTicks()) / 20;
                     player.sendSystemMessage(Component.literal(abilityName + " is on cooldown (" + seconds + "s).").withStyle(ChatFormatting.RED));
                     return;
                 }

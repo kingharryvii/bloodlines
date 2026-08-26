@@ -11,8 +11,9 @@ import java.util.function.Supplier;
 /**
  * S2C, no payload - tells the activating player's own client "your ability just fired", so the cooldown/duration
  * HUD bars (see AbilityHudState/AbilityCooldownOverlay) have a clock to count from. The actual cooldown and
- * duration lengths aren't sent since they're the same RaceAbility.COOLDOWN_TICKS/DURATION_TICKS constants both
- * sides already have - this packet is purely a "start the clock now" trigger.
+ * duration lengths aren't sent since RaceAbility.cooldownTicks()/durationTicks() read from BloodlinesConfig, a
+ * SERVER-type config Forge auto-syncs to every connecting client - both sides already agree on the same numbers
+ * by the time this fires, so this packet is purely a "start the clock now" trigger.
  */
 public class AbilityActivatedPacket
 {

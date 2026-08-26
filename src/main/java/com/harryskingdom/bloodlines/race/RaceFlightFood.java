@@ -1,5 +1,6 @@
 package com.harryskingdom.bloodlines.race;
 
+import com.harryskingdom.bloodlines.config.BloodlinesConfig;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -8,15 +9,12 @@ import net.minecraft.server.level.ServerPlayer;
  * double-tap-jump input), gated by hunger instead of a custom stamina resource - the same approach Icarus itself
  * offers as an alternative to its stamina attribute (see IcarusHelper.canFly and ApplyBoostPacket in their
  * source): a minimum food level required to fly at all, and food exhaustion added while actively thrusting
- * forward during flight (not just while airborne), at the same threshold and rate Icarus defaults to. Recovery
- * is entirely vanilla's own hunger/saturation regen - there's no separate resource or per-player state to track
- * here.
+ * forward during flight (not just while airborne), at the same threshold and rate Icarus defaults to (both
+ * configurable - see BloodlinesConfig). Recovery is entirely vanilla's own hunger/saturation regen - there's no
+ * separate resource or per-player state to track here.
  */
 public final class RaceFlightFood
 {
-    private static final int REQUIRED_FOOD_LEVEL = 7;
-    private static final float EXHAUSTION_PER_BOOST_TICK = 0.03F;
-
     private RaceFlightFood() {}
 
     /** Called every tick for Fae players: cuts flight if too hungry, otherwise drains food while thrusting forward. */
@@ -25,7 +23,7 @@ public final class RaceFlightFood
         if (!player.getAbilities().flying || player.isCreative())
             return;
 
-        if (player.getFoodData().getFoodLevel() < REQUIRED_FOOD_LEVEL)
+        if (player.getFoodData().getFoodLevel() < BloodlinesConfig.FAE_REQUIRED_FOOD_LEVEL.get())
         {
             player.getAbilities().flying = false;
             player.onUpdateAbilities();
@@ -34,6 +32,6 @@ public final class RaceFlightFood
         }
 
         if (player.zza > 0)
-            player.getFoodData().addExhaustion(EXHAUSTION_PER_BOOST_TICK);
+            player.getFoodData().addExhaustion(BloodlinesConfig.FAE_EXHAUSTION_PER_BOOST_TICK.get().floatValue());
     }
 }
