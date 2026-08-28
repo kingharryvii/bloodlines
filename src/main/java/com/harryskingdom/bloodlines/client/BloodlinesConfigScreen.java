@@ -1,55 +1,85 @@
 package com.harryskingdom.bloodlines.client;
 
 import com.harryskingdom.bloodlines.config.BloodlinesConfig;
+import com.harryskingdom.bloodlines.network.BloodlinesNetwork;
+import com.harryskingdom.bloodlines.network.UpdateBloodlinesConfigPacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import net.minecraftforge.client.ConfigScreenHandler;
 import net.minecraftforge.fml.ModLoadingContext;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Hand-rolled "Config" screen for the Mods list (no Cloth Config dependency - just Forge's own
  * ConfigScreenHandler.ConfigScreenFactory extension point plus vanilla widgets).
  * <p>
- * Editing is restricted to Minecraft.hasSingleplayerServer() (true only for singleplayer, or for you
- * specifically if you opened to LAN) - NOT a permission-level check, a "can this even work" check. Traced
- * through Forge's real sync code (ConfigSync.receiveSyncedConfig, ModConfig.acceptSyncedConfig/save): a client
- * connected to someone else's server has its SERVER-type config's backing object replaced by a plain in-memory
- * CommentedConfig parsed straight from the sync packet, not the original CommentedFileConfig. ModConfig.save()
- * unconditionally casts to CommentedFileConfig - so calling it as a synced (non-host) client throws a
- * ClassCastException, not just "shouldn't be allowed", it fails outright. There is no built-in mechanism for a
- * client to push config edits back to a remote dedicated server; the sync is one-directional by design. So a
- * non-host player gets a read-only view of the same rows instead of a broken Save button.
+ * Two different players can legitimately edit this, and they save two different ways:
+ * - The singleplayer/LAN host: their BloodlinesConfig.SPEC IS the real file, so Save writes to it directly, the
+ *   same technique any hand-rolled COMMON-config screen would use.
+ * - An op connected to someone else's dedicated server: traced through Forge's real sync code
+ *   (ConfigSync.receiveSyncedConfig, ModConfig.acceptSyncedConfig/save) - their client's SERVER-type config has
+ *   its backing object replaced by a plain in-memory CommentedConfig parsed straight from the sync packet, not
+ *   the original CommentedFileConfig. ModConfig.save() unconditionally casts to CommentedFileConfig, so calling
+ *   it on a synced client throws a ClassCastException outright - there's no built-in mechanism for a client to
+ *   push config edits back to a remote server, the sync is one-directional by design. So instead, Save sends
+ *   UpdateBloodlinesConfigPacket to the server, which re-checks hasPermissions(2) itself (never trust the
+ *   client-side gate alone for something privileged) and applies the change to its own real config there.
+ * A player who is neither gets a read-only view of the same rows instead of a broken Save button.
+ * <p>
+ * The row list is scrollable - an earlier fixed-offset-from-height/2 layout looked fine at GUI Scale 1 on a
+ * large window but overlapped the title at higher scale/smaller windows (this.width/this.height shrink as GUI
+ * Scale increases, same class of bug BloodlineSelectScreen already had to account for). Rows are added via
+ * addWidget() rather than addRenderableWidget() specifically so their rendering/hit-testing can be driven by
+ * this screen's own scroll offset instead of Minecraft's default "always visible" widget handling - toggling a
+ * scrolled-out row's `visible` field is enough to disable both, since AbstractWidget.render()/mouseClicked()
+ * both check it internally (confirmed by decompiling AbstractWidget, not assumed).
  */
 public final class BloodlinesConfigScreen extends Screen
 {
     private static final int FIELD_WIDTH = 100;
     private static final int FIELD_HEIGHT = 20;
+    private static final int ARMOR_BUTTON_WIDTH = FIELD_WIDTH + 30;
+    private static final int FIELD_X_OFFSET = 10;
     private static final int ROW_HEIGHT = 24;
     private static final int LABEL_OFFSET_X = 150;
+    private static final int TOP_MARGIN = 40;
+    private static final int READONLY_NOTE_Y = 24;
+    private static final int BOTTOM_BUTTON_HEIGHT = 20;
+    private static final int BOTTOM_SCREEN_MARGIN = 14;
+    private static final int VIEWPORT_GAP_ABOVE_BUTTONS = 12;
+    private static final int SCROLL_STEP = 16;
+    private static final int SCROLLBAR_WIDTH = 3;
 
-    // Must mirror the ranges given to BloodlinesConfig's defineInRange() calls - ForgeConfigSpec doesn't expose
-    // a value's own valid range back out, so client-side clamping duplicates them here on purpose.
-    private static final int FOOD_LEVEL_MIN = 0, FOOD_LEVEL_MAX = 20;
-    private static final double EXHAUSTION_MIN = 0.0, EXHAUSTION_MAX = 1.0;
-    private static final double FLY_SPEED_MIN = 0.005, FLY_SPEED_MAX = 0.5;
-    private static final int SECONDS_MIN = 1, COOLDOWN_MAX = 3600, DURATION_MAX = 600;
+    private record Row(AbstractWidget widget, String label, int baseY) {}
 
     private final Screen parent;
+    private final List<Row> rows = new ArrayList<>();
 
     private EditBox foodLevelBox;
     private EditBox exhaustionBox;
     private EditBox flySpeedBox;
     private EditBox cooldownBox;
     private EditBox durationBox;
+    private EditBox orbRarityBox;
     private CycleButton<BloodlinesConfig.MaxArmorTier> faeArmorTierButton;
     private CycleButton<BloodlinesConfig.MaxArmorTier> angelkinArmorTierButton;
     private CycleButton<BloodlinesConfig.MaxArmorTier> demonkinArmorTierButton;
+
+    private int viewportTop;
+    private int viewportBottom;
+    private int buttonY;
+    private int scrollOffset;
+    private int scrollMax;
 
     private Component statusMessage = Component.empty();
 
@@ -70,9 +100,19 @@ public final class BloodlinesConfigScreen extends Screen
         return Minecraft.getInstance().hasSingleplayerServer();
     }
 
+    /** Op level 2 - matches the threshold RaceCommands already uses for its own /race admin subcommands. */
+    private static boolean isOp()
+    {
+        var player = Minecraft.getInstance().player;
+        return player != null && player.getPermissionLevel() >= 2;
+    }
+
     @Override
     protected void init()
     {
+        rows.clear();
+        scrollOffset = 0;
+
         if (!BloodlinesConfig.SPEC.isLoaded())
         {
             addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose())
@@ -80,88 +120,149 @@ public final class BloodlinesConfigScreen extends Screen
             return;
         }
 
-        boolean editable = isHost();
+        boolean editable = isHost() || isOp();
+        int fieldX = width / 2 + FIELD_X_OFFSET;
 
-        int fieldX = width / 2 + 10;
-        int y = height / 2 - 134;
+        addRow("Fae required food level", addField(fieldX, String.valueOf(BloodlinesConfig.FAE_REQUIRED_FOOD_LEVEL.get()), editable));
+        addRow("Fae exhaustion / boost tick", addField(fieldX, String.valueOf(BloodlinesConfig.FAE_EXHAUSTION_PER_BOOST_TICK.get()), editable));
+        addRow("Fae flying speed", addField(fieldX, String.valueOf(BloodlinesConfig.FAE_FLYING_SPEED.get()), editable));
+        addRow("Fae max armor tier", addArmorTierButton(fieldX, BloodlinesConfig.FAE_MAX_ARMOR_TIER.get(), editable));
+        addRow("Angelkin max armor tier", addArmorTierButton(fieldX, BloodlinesConfig.ANGELKIN_MAX_ARMOR_TIER.get(), editable));
+        addRow("Demonkin max armor tier", addArmorTierButton(fieldX, BloodlinesConfig.DEMONKIN_MAX_ARMOR_TIER.get(), editable));
+        addRow("Ability cooldown (seconds)", addField(fieldX, String.valueOf(BloodlinesConfig.ABILITY_COOLDOWN_SECONDS.get()), editable));
+        addRow("Ability duration (seconds)", addField(fieldX, String.valueOf(BloodlinesConfig.ABILITY_DURATION_SECONDS.get()), editable));
+        addRow("Orb of Bloodlines spawn rarity", addField(fieldX, String.valueOf(BloodlinesConfig.ORB_SPAWN_RARITY_MULTIPLIER.get()), editable));
 
-        foodLevelBox = addField(fieldX, y, String.valueOf(BloodlinesConfig.FAE_REQUIRED_FOOD_LEVEL.get()), editable);
-        y += ROW_HEIGHT;
-        exhaustionBox = addField(fieldX, y, String.valueOf(BloodlinesConfig.FAE_EXHAUSTION_PER_BOOST_TICK.get()), editable);
-        y += ROW_HEIGHT;
-        flySpeedBox = addField(fieldX, y, String.valueOf(BloodlinesConfig.FAE_FLYING_SPEED.get()), editable);
-        y += ROW_HEIGHT;
+        // Fields above are assigned in addRow() call order, matching this declaration order.
+        foodLevelBox = (EditBox) rows.get(0).widget();
+        exhaustionBox = (EditBox) rows.get(1).widget();
+        flySpeedBox = (EditBox) rows.get(2).widget();
+        faeArmorTierButton = castArmorButton(rows.get(3).widget());
+        angelkinArmorTierButton = castArmorButton(rows.get(4).widget());
+        demonkinArmorTierButton = castArmorButton(rows.get(5).widget());
+        cooldownBox = (EditBox) rows.get(6).widget();
+        durationBox = (EditBox) rows.get(7).widget();
+        orbRarityBox = (EditBox) rows.get(8).widget();
 
-        faeArmorTierButton = addArmorTierButton(fieldX, y, BloodlinesConfig.FAE_MAX_ARMOR_TIER.get(), editable);
-        y += ROW_HEIGHT;
-        angelkinArmorTierButton = addArmorTierButton(fieldX, y, BloodlinesConfig.ANGELKIN_MAX_ARMOR_TIER.get(), editable);
-        y += ROW_HEIGHT;
-        demonkinArmorTierButton = addArmorTierButton(fieldX, y, BloodlinesConfig.DEMONKIN_MAX_ARMOR_TIER.get(), editable);
-        y += ROW_HEIGHT;
+        buttonY = height - BOTTOM_BUTTON_HEIGHT - BOTTOM_SCREEN_MARGIN;
+        viewportTop = TOP_MARGIN;
+        viewportBottom = Math.max(viewportTop, buttonY - VIEWPORT_GAP_ABOVE_BUTTONS);
 
-        cooldownBox = addField(fieldX, y, String.valueOf(BloodlinesConfig.ABILITY_COOLDOWN_SECONDS.get()), editable);
-        y += ROW_HEIGHT;
-        durationBox = addField(fieldX, y, String.valueOf(BloodlinesConfig.ABILITY_DURATION_SECONDS.get()), editable);
-        y += ROW_HEIGHT + 16;
+        int contentHeight = rows.size() * ROW_HEIGHT;
+        int viewportHeight = viewportBottom - viewportTop;
+        scrollMax = Math.max(0, contentHeight - viewportHeight);
+        layoutRows();
 
         if (editable)
         {
             addRenderableWidget(Button.builder(Component.literal("Save"), b -> save())
-                    .bounds(width / 2 - 105, y, 100, 20).build());
+                    .bounds(width / 2 - 105, buttonY, 100, 20).build());
             addRenderableWidget(Button.builder(Component.literal("Cancel"), b -> onClose())
-                    .bounds(width / 2 + 5, y, 100, 20).build());
+                    .bounds(width / 2 + 5, buttonY, 100, 20).build());
         }
         else
         {
             addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose())
-                    .bounds(width / 2 - 75, y, 150, 20).build());
+                    .bounds(width / 2 - 75, buttonY, 150, 20).build());
         }
     }
 
-    private EditBox addField(int x, int y, String initialValue, boolean editable)
+    @SuppressWarnings("unchecked")
+    private static CycleButton<BloodlinesConfig.MaxArmorTier> castArmorButton(AbstractWidget widget)
     {
-        EditBox box = new EditBox(font, x, y, FIELD_WIDTH, FIELD_HEIGHT, Component.empty());
-        box.setValue(initialValue);
-        box.setEditable(editable);
-        return addRenderableWidget(box);
+        return (CycleButton<BloodlinesConfig.MaxArmorTier>) widget;
     }
 
-    private CycleButton<BloodlinesConfig.MaxArmorTier> addArmorTierButton(int x, int y, BloodlinesConfig.MaxArmorTier initialValue, boolean editable)
+    private void addRow(String label, AbstractWidget widget)
     {
-        CycleButton<BloodlinesConfig.MaxArmorTier> button = addRenderableWidget(
-                CycleButton.<BloodlinesConfig.MaxArmorTier>builder(tier -> Component.literal(tier.name()))
-                        .withValues(BloodlinesConfig.MaxArmorTier.values())
-                        .withInitialValue(initialValue)
-                        .displayOnlyValue()
-                        .create(x, y, FIELD_WIDTH + 30, FIELD_HEIGHT, Component.empty()));
+        rows.add(new Row(widget, label, rows.size() * ROW_HEIGHT));
+    }
+
+    /** Positions every row from its fixed baseY and the current scrollOffset, and hides rows the scroll has pushed
+     *  outside the viewport - AbstractWidget.render()/mouseClicked() both skip a widget once `visible` is false. */
+    private void layoutRows()
+    {
+        for (Row row : rows)
+        {
+            int y = viewportTop - scrollOffset + row.baseY();
+            row.widget().setY(y);
+            row.widget().visible = y >= viewportTop && y + FIELD_HEIGHT <= viewportBottom;
+        }
+    }
+
+    private EditBox addField(int x, String initialValue, boolean editable)
+    {
+        EditBox box = new EditBox(font, x, 0, FIELD_WIDTH, FIELD_HEIGHT, Component.empty());
+        box.setValue(initialValue);
+        box.setEditable(editable);
+        return addWidget(box);
+    }
+
+    private CycleButton<BloodlinesConfig.MaxArmorTier> addArmorTierButton(int x, BloodlinesConfig.MaxArmorTier initialValue, boolean editable)
+    {
+        CycleButton<BloodlinesConfig.MaxArmorTier> button = CycleButton.<BloodlinesConfig.MaxArmorTier>builder(tier -> Component.literal(tier.name()))
+                .withValues(BloodlinesConfig.MaxArmorTier.values())
+                .withInitialValue(initialValue)
+                .displayOnlyValue()
+                .create(x, 0, ARMOR_BUTTON_WIDTH, FIELD_HEIGHT, Component.empty());
         button.active = editable;
-        return button;
+        return addWidget(button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta)
+    {
+        if (scrollMax > 0)
+        {
+            scrollOffset = Mth.clamp((int) (scrollOffset - delta * SCROLL_STEP), 0, scrollMax);
+            layoutRows();
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
     }
 
     private void save()
     {
         // Belt-and-suspenders - the Save button only exists when editable, but this is exactly the kind of
         // boundary worth checking again right before the action it guards rather than trusting the UI alone.
-        if (!isHost())
+        boolean host = isHost();
+        if (!host && !isOp())
             return;
 
         try
         {
-            int foodLevel = clamp(Integer.parseInt(foodLevelBox.getValue().trim()), FOOD_LEVEL_MIN, FOOD_LEVEL_MAX);
-            double exhaustion = clamp(Double.parseDouble(exhaustionBox.getValue().trim()), EXHAUSTION_MIN, EXHAUSTION_MAX);
-            double flySpeed = clamp(Double.parseDouble(flySpeedBox.getValue().trim()), FLY_SPEED_MIN, FLY_SPEED_MAX);
-            int cooldown = clamp(Integer.parseInt(cooldownBox.getValue().trim()), SECONDS_MIN, COOLDOWN_MAX);
-            int duration = clamp(Integer.parseInt(durationBox.getValue().trim()), SECONDS_MIN, DURATION_MAX);
+            int foodLevel = clamp(Integer.parseInt(foodLevelBox.getValue().trim()), BloodlinesConfig.FAE_FOOD_LEVEL_MIN, BloodlinesConfig.FAE_FOOD_LEVEL_MAX);
+            double exhaustion = clamp(Double.parseDouble(exhaustionBox.getValue().trim()), BloodlinesConfig.FAE_EXHAUSTION_MIN, BloodlinesConfig.FAE_EXHAUSTION_MAX);
+            double flySpeed = clamp(Double.parseDouble(flySpeedBox.getValue().trim()), BloodlinesConfig.FAE_FLY_SPEED_MIN, BloodlinesConfig.FAE_FLY_SPEED_MAX);
+            int cooldown = clamp(Integer.parseInt(cooldownBox.getValue().trim()), BloodlinesConfig.ABILITY_SECONDS_MIN, BloodlinesConfig.ABILITY_COOLDOWN_MAX);
+            int duration = clamp(Integer.parseInt(durationBox.getValue().trim()), BloodlinesConfig.ABILITY_SECONDS_MIN, BloodlinesConfig.ABILITY_DURATION_MAX);
+            double orbRarity = clamp(Double.parseDouble(orbRarityBox.getValue().trim()), BloodlinesConfig.ORB_RARITY_MULTIPLIER_MIN, BloodlinesConfig.ORB_RARITY_MULTIPLIER_MAX);
+            BloodlinesConfig.MaxArmorTier faeTier = faeArmorTierButton.getValue();
+            BloodlinesConfig.MaxArmorTier angelkinTier = angelkinArmorTierButton.getValue();
+            BloodlinesConfig.MaxArmorTier demonkinTier = demonkinArmorTierButton.getValue();
 
-            BloodlinesConfig.FAE_REQUIRED_FOOD_LEVEL.set(foodLevel);
-            BloodlinesConfig.FAE_EXHAUSTION_PER_BOOST_TICK.set(exhaustion);
-            BloodlinesConfig.FAE_FLYING_SPEED.set(flySpeed);
-            BloodlinesConfig.FAE_MAX_ARMOR_TIER.set(faeArmorTierButton.getValue());
-            BloodlinesConfig.ANGELKIN_MAX_ARMOR_TIER.set(angelkinArmorTierButton.getValue());
-            BloodlinesConfig.DEMONKIN_MAX_ARMOR_TIER.set(demonkinArmorTierButton.getValue());
-            BloodlinesConfig.ABILITY_COOLDOWN_SECONDS.set(cooldown);
-            BloodlinesConfig.ABILITY_DURATION_SECONDS.set(duration);
-            BloodlinesConfig.SPEC.save();
+            if (host)
+            {
+                // The host's own BloodlinesConfig.SPEC is the real file - safe to write directly, same as any
+                // ordinary COMMON-config screen would.
+                BloodlinesConfig.FAE_REQUIRED_FOOD_LEVEL.set(foodLevel);
+                BloodlinesConfig.FAE_EXHAUSTION_PER_BOOST_TICK.set(exhaustion);
+                BloodlinesConfig.FAE_FLYING_SPEED.set(flySpeed);
+                BloodlinesConfig.FAE_MAX_ARMOR_TIER.set(faeTier);
+                BloodlinesConfig.ANGELKIN_MAX_ARMOR_TIER.set(angelkinTier);
+                BloodlinesConfig.DEMONKIN_MAX_ARMOR_TIER.set(demonkinTier);
+                BloodlinesConfig.ABILITY_COOLDOWN_SECONDS.set(cooldown);
+                BloodlinesConfig.ABILITY_DURATION_SECONDS.set(duration);
+                BloodlinesConfig.ORB_SPAWN_RARITY_MULTIPLIER.set(orbRarity);
+                BloodlinesConfig.SPEC.save();
+            }
+            else
+            {
+                // An op on a remote server - their local SPEC is only a synced read-only copy (see class doc), so
+                // the real write has to happen server-side instead.
+                BloodlinesNetwork.CHANNEL.sendToServer(new UpdateBloodlinesConfigPacket(
+                        foodLevel, exhaustion, flySpeed, faeTier, angelkinTier, demonkinTier, cooldown, duration, orbRarity));
+            }
 
             onClose();
         }
@@ -195,31 +296,37 @@ public final class BloodlinesConfigScreen extends Screen
         }
         else
         {
-            if (!isHost())
+            if (!isHost() && !isOp())
                 graphics.drawCenteredString(font,
-                        Component.literal("Read-only - only the server host can change these.").withStyle(ChatFormatting.GRAY),
-                        width / 2, height / 2 - 152, 0xAAAAAA);
+                        Component.literal("Read-only - ask a server op to change these.").withStyle(ChatFormatting.GRAY),
+                        width / 2, READONLY_NOTE_Y, 0xAAAAAA);
 
             int labelX = width / 2 - LABEL_OFFSET_X;
-            int y = height / 2 - 134;
-            drawLabel(graphics, "Fae required food level", labelX, y);
-            y += ROW_HEIGHT;
-            drawLabel(graphics, "Fae exhaustion / boost tick", labelX, y);
-            y += ROW_HEIGHT;
-            drawLabel(graphics, "Fae flying speed", labelX, y);
-            y += ROW_HEIGHT;
-            drawLabel(graphics, "Fae max armor tier", labelX, y);
-            y += ROW_HEIGHT;
-            drawLabel(graphics, "Angelkin max armor tier", labelX, y);
-            y += ROW_HEIGHT;
-            drawLabel(graphics, "Demonkin max armor tier", labelX, y);
-            y += ROW_HEIGHT;
-            drawLabel(graphics, "Ability cooldown (seconds)", labelX, y);
-            y += ROW_HEIGHT;
-            drawLabel(graphics, "Ability duration (seconds)", labelX, y);
+            for (Row row : rows)
+            {
+                if (!row.widget().visible)
+                    continue;
+
+                drawLabel(graphics, row.label(), labelX, row.widget().getY());
+                // Rows are added via addWidget(), not addRenderableWidget(), specifically so scrolling can control
+                // their visibility - but that also means they're never in Screen's own auto-rendered list, so
+                // they have to be drawn by hand here, same as any other manually-managed widget.
+                row.widget().render(graphics, mouseX, mouseY, partialTick);
+            }
+
+            if (scrollMax > 0)
+            {
+                int trackX = width / 2 + FIELD_X_OFFSET + ARMOR_BUTTON_WIDTH + 10;
+                int viewportHeight = viewportBottom - viewportTop;
+                int contentHeight = rows.size() * ROW_HEIGHT;
+                graphics.fill(trackX, viewportTop, trackX + SCROLLBAR_WIDTH, viewportBottom, 0x40000000);
+                int thumbHeight = Math.max(10, viewportHeight * viewportHeight / contentHeight);
+                int thumbY = viewportTop + (viewportHeight - thumbHeight) * scrollOffset / scrollMax;
+                graphics.fill(trackX, thumbY, trackX + SCROLLBAR_WIDTH, thumbY + thumbHeight, 0xFFAAAAAA);
+            }
 
             if (!statusMessage.getString().isEmpty())
-                graphics.drawCenteredString(font, statusMessage, width / 2, height / 2 + 140, 0xFF5555);
+                graphics.drawCenteredString(font, statusMessage, width / 2, buttonY - 10, 0xFF5555);
         }
 
         super.render(graphics, mouseX, mouseY, partialTick);

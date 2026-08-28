@@ -170,9 +170,9 @@ Required — `mods.toml` declares all three `mandatory=false`.
 - **Display name**: "Bloodlines" (no server-specific branding — this may be used on other servers)
 - **Java**: 17, **Game version**: 1.20.1, **Loader**: Forge
 - **License**: All Rights Reserved (matches `mods.toml`'s `mod_license`)
-- **Credits** (also baked into `mods.toml`'s `credits` field, shown in-game): Fae wings adapted from
-  *Medieval Origins Revival* by muon-rw (CC BY 4.0); Merfolk tail texture adapted from Aino's Mermod
-  Mermaid Tail Retexture.
+- **Credits** (also baked into `mods.toml`'s `credits` field, shown in-game): Fae wing *texture* adapted
+  from *Medieval Origins Revival* by muon-rw (CC BY 4.0) — the flap animation itself is original, not
+  adapted; Merfolk tail texture adapted from Aino's Mermod Mermaid Tail Retexture.
 - Internal mod ID (`harrys_bloodlines`) and Java package (`com.harryskingdom.bloodlines`) were
   deliberately left unchanged when genericizing the display name — renaming those would mean
   rewriting every texture path, capability ID, and network channel name for zero visible benefit

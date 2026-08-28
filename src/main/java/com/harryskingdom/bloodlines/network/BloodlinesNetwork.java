@@ -31,5 +31,7 @@ public final class BloodlinesNetwork
                 SyncPlayerRacePacket::encode, SyncPlayerRacePacket::decode, SyncPlayerRacePacket::handle);
         CHANNEL.registerMessage(id++, AbilityActivatedPacket.class,
                 AbilityActivatedPacket::encode, AbilityActivatedPacket::decode, AbilityActivatedPacket::handle);
+        CHANNEL.registerMessage(id++, UpdateBloodlinesConfigPacket.class,
+                UpdateBloodlinesConfigPacket::encode, UpdateBloodlinesConfigPacket::decode, UpdateBloodlinesConfigPacket::handle);
     }
 }
