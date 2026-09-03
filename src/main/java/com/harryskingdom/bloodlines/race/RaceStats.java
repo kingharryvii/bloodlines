@@ -27,13 +27,10 @@ public record RaceStats(
         {
             // Jack-of-all-trades: small nudges spread across melee, ranged, luck, speed and mining rather than
             // one specialization - each individual number is well below any specialist race's number in that
-            // same category (e.g. bowDamageMultiplier 0.05 vs Wood Elf's 0.25), so Human is versatile without
-            // matching a dedicated race at its own game. attackSpeedMultiplier/luckBonus double as the "can
-            // dabble in magic too" nod, on the same stats High Elf's own caster kit leans on, just smaller.
+            // same category (e.g. bowDamageMultiplier 0.05 vs Elf's own 0.15), so Demi-Human is versatile
+            // without matching a dedicated race at its own game. attackSpeedMultiplier/luckBonus double as the
+            // "can dabble in magic too" nod, on the same stats Elf's own kit leans on, just smaller.
             case HUMAN -> new RaceStats(1, 0, 1, 0, 1, 0.1, false, false, false, false, 0.1, 0.05, false, 0, false, 0);
-            case WOOD_ELF -> new RaceStats(-2, 0.1, 0, 0, 0, 0, false, false, false, false, 0, 0.25, false, 0, false, 0);
-            case HIGH_ELF -> new RaceStats(0, 0, -1, 0, 2, 0.1, false, false, false, false, 0, 0, false, 0, false, 0);
-            case MOON_ELF -> new RaceStats(-2, 0.05, 0, 0, 0, 0, true, false, false, false, 0, 0, false, 0, false, 0);
             case DWARF -> new RaceStats(2, -0.05, 0, 0.1, 0, 0, false, true, false, false, 0.3, 0, false, 0, false, 0);
             // healthBonus -4 (was -6): still by far the frailest race in the game (next-worst penalty anywhere
             // is -2), but softened now that flight costs three separate things instead of one - hunger-gating
@@ -58,7 +55,15 @@ public record RaceStats(
             // "can climb walls" stat to add here). Bumped to Rare given how much it carries relative to a
             // typical Uncommon kit.
             case BEASTKIN -> new RaceStats(2, 0.1, 2, 0.1, 0, 0.1, true, false, false, false, -0.1, 0, false, 0, false, 0.5);
-            // luckBonus -1 added (matches Ghoul/Demonkin's own "cursed undead" penalty) and attackSpeedMultiplier
+            // Merged from Wood Elf (speed, bowDamageMultiplier), High Elf (attackDamageBonus penalty, luckBonus,
+            // attackSpeedMultiplier) and Moon Elf (nightVision) - each number pulled down from what the original
+            // race had alone, same "combine, don't just stack" discipline as Beastkin's own merge above (Wood
+            // Elf's own +0.25 bow bonus alone was already the single highest of any race; +0.15 here keeps it
+            // clearly ahead of Human's own +0.05 dabbling without also carrying speed/luck/attack-speed/night
+            // vision at full strength on top of it). Bumped to Rare for the same reason Beastkin was - a
+            // three-way merge inherently carries more at once than any Uncommon-tier kit was ever sized for.
+            case ELF -> new RaceStats(-2, 0.1, -1, 0, 1, 0.1, true, false, false, false, 0, 0.15, false, 0, false, 0);
+            // luckBonus -1 added (matches Demonkin's own "cursed undead" penalty) and attackSpeedMultiplier
             // brought down from 0.15 to 0.1 - was the single highest attack speed of any race, stacked on top of
             // being the only race with passive lifesteal (25%, everyone else's sustain is ability-gated only).
             // That combination read as stronger in practice than the stat sheet alone suggested, so the attack
@@ -66,7 +71,6 @@ public record RaceStats(
             // while the passive lifesteal itself - the actually distinctive part of "vampiric hunger" - stays
             // untouched.
             case REVENANT -> new RaceStats(-2, 0.1, 2, 0, -1, 0.1, true, false, false, false, 0, 0, false, 0.25, true, 0);
-            case GHOUL -> new RaceStats(4, -0.1, 1, 0.15, -1, 0, true, false, false, true, 0, 0, false, 0, true, 0);
             // healthBonus +3 (was -2, then +2): offsets the chainmail-only armor cap added alongside flight -
             // without it, Demonkin stacked "squishiest race" and "capped gear" with no defensive compensation.
             // Now matches Angelkin's own health exactly (see SERAPH below) - the two winged RARE races otherwise
@@ -78,7 +82,7 @@ public record RaceStats(
             // misjudging a fall, not a race with actual slow-fall magic. luckBonus -1 and miningSpeedMultiplier
             // -0.1 added: before this, Demonkin was the only race in the game with zero negative stats at all -
             // every value neutral or positive, no drawback besides the armor cap shared with Fae/Angelkin. -1
-            // luck matches Ghoul's own "cursed" penalty (an infernal race being unlucky needs no more than that
+            // luck matches Revenant's own "cursed" penalty (an infernal race being unlucky needs no more than that
             // to sell "it's a demon"), -10% mining matches Angelkin/Beastkin so all three "less grounded" races
             // share one consistent number instead of each inventing their own.
             case DEMON -> new RaceStats(3, 0.05, 2, 0, -1, 0.1, true, true, false, false, -0.1, 0, false, 0, false, 0.6);
@@ -105,7 +109,13 @@ public record RaceStats(
             // then +4): brought down to match Demonkin's own +3 exactly - the two winged RARE races otherwise
             // trade an aggressive kit for a defensive/support one (see the DEMON comment above), and there was no
             // longer a good reason for Angelkin to also just have more raw health than Demonkin on top of that.
-            case SERAPH -> new RaceStats(3, -0.1, 2, 0.15, 2, 0, false, false, false, false, -0.2, 0, false, 0, false, 0.6);
+            // miningSpeedMultiplier -0.1 (was -0.2): actually brings it in line with the DEMON comment's own claim
+            // that Angelkin/Beastkin/Demonkin all share one -10% mining number - the code had drifted to -20% at
+            // some point without that comment being updated, reading as a much harsher penalty than intended.
+            // knockbackResistance 0.1 (was 0.15), trimmed to compensate for the mining fix - brings Angelkin down
+            // to the same knockback resist Beastkin/Merfolk already sit at, rather than uniquely the second-highest
+            // of any race, now that its mining penalty is no longer carrying extra weight on its own.
+            case SERAPH -> new RaceStats(3, -0.1, 2, 0.1, 2, 0, false, false, false, false, -0.1, 0, false, 0, false, 0.6);
 
             // Dragonborn has no stats yet — designed alongside the Dragon Shrine unlock.
             default -> NONE;

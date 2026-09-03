@@ -23,7 +23,7 @@ public interface IPlayerRace
 
     /**
      * Player-controlled toggle (default on) for purely cosmetic/passive racial effects that tint or otherwise
-     * change the screen - currently Night Vision (Beastkin/Revenant/Ghoul/Demonkin/Moon Elf's innate grant, and
+     * change the screen - currently Night Vision (Beastkin/Revenant/Demonkin/Elf's innate grant, and
      * Merfolk's underwater-only grant) and Fae's Slow Falling. Doesn't touch anything mechanical (attribute
      * bonuses, water breathing, fire resistance, etc.) - only the handful of effects a player might want to look
      * at their own screen without.

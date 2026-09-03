@@ -88,8 +88,19 @@ public class PlayerRaceProvider implements ICapabilitySerializable<CompoundTag>
             playerRace.setPassiveVisualsEnabled(tag.getBoolean("PassiveVisualsEnabled"));
     }
 
+    /**
+     * Wood Elf, High Elf and Moon Elf were merged into one combined Elf race - checked by name, not enum
+     * constant, since the old constants no longer exist to reference at all (Race.valueOf() would just throw
+     * IllegalArgumentException for them, same as any other unrecognized string). Migrating explicitly here means
+     * a player who had one of the three picked lands on the new race automatically on next load, rather than
+     * falling through to tryParseRace's own "unrecognized name -> no race chosen" fallback and landing back on
+     * the race-selection screen.
+     */
     private static java.util.Optional<Race> tryParseRace(String name)
     {
+        if (name.equals("WOOD_ELF") || name.equals("HIGH_ELF") || name.equals("MOON_ELF"))
+            return java.util.Optional.of(Race.ELF);
+
         try
         {
             return java.util.Optional.of(Race.valueOf(name));

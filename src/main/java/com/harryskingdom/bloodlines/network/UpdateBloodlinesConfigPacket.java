@@ -34,11 +34,13 @@ public class UpdateBloodlinesConfigPacket
     private final String demonkinTier;
     private final int cooldownSeconds;
     private final int durationSeconds;
+    private final int secondaryCooldownSeconds;
+    private final int secondaryDurationSeconds;
     private final double orbRarityMultiplier;
 
     public UpdateBloodlinesConfigPacket(int foodLevel, double exhaustion, double flySpeed,
             BloodlinesConfig.MaxArmorTier faeTier, BloodlinesConfig.MaxArmorTier angelkinTier, BloodlinesConfig.MaxArmorTier demonkinTier,
-            int cooldownSeconds, int durationSeconds, double orbRarityMultiplier)
+            int cooldownSeconds, int durationSeconds, int secondaryCooldownSeconds, int secondaryDurationSeconds, double orbRarityMultiplier)
     {
         this.foodLevel = foodLevel;
         this.exhaustion = exhaustion;
@@ -48,11 +50,14 @@ public class UpdateBloodlinesConfigPacket
         this.demonkinTier = demonkinTier.name();
         this.cooldownSeconds = cooldownSeconds;
         this.durationSeconds = durationSeconds;
+        this.secondaryCooldownSeconds = secondaryCooldownSeconds;
+        this.secondaryDurationSeconds = secondaryDurationSeconds;
         this.orbRarityMultiplier = orbRarityMultiplier;
     }
 
     private UpdateBloodlinesConfigPacket(int foodLevel, double exhaustion, double flySpeed,
-            String faeTier, String angelkinTier, String demonkinTier, int cooldownSeconds, int durationSeconds, double orbRarityMultiplier)
+            String faeTier, String angelkinTier, String demonkinTier, int cooldownSeconds, int durationSeconds,
+            int secondaryCooldownSeconds, int secondaryDurationSeconds, double orbRarityMultiplier)
     {
         this.foodLevel = foodLevel;
         this.exhaustion = exhaustion;
@@ -62,6 +67,8 @@ public class UpdateBloodlinesConfigPacket
         this.demonkinTier = demonkinTier;
         this.cooldownSeconds = cooldownSeconds;
         this.durationSeconds = durationSeconds;
+        this.secondaryCooldownSeconds = secondaryCooldownSeconds;
+        this.secondaryDurationSeconds = secondaryDurationSeconds;
         this.orbRarityMultiplier = orbRarityMultiplier;
     }
 
@@ -75,13 +82,16 @@ public class UpdateBloodlinesConfigPacket
         buf.writeUtf(msg.demonkinTier);
         buf.writeVarInt(msg.cooldownSeconds);
         buf.writeVarInt(msg.durationSeconds);
+        buf.writeVarInt(msg.secondaryCooldownSeconds);
+        buf.writeVarInt(msg.secondaryDurationSeconds);
         buf.writeDouble(msg.orbRarityMultiplier);
     }
 
     public static UpdateBloodlinesConfigPacket decode(FriendlyByteBuf buf)
     {
         return new UpdateBloodlinesConfigPacket(buf.readVarInt(), buf.readDouble(), buf.readDouble(),
-                buf.readUtf(), buf.readUtf(), buf.readUtf(), buf.readVarInt(), buf.readVarInt(), buf.readDouble());
+                buf.readUtf(), buf.readUtf(), buf.readUtf(), buf.readVarInt(), buf.readVarInt(),
+                buf.readVarInt(), buf.readVarInt(), buf.readDouble());
     }
 
     public static void handle(UpdateBloodlinesConfigPacket msg, Supplier<NetworkEvent.Context> ctxSupplier)
@@ -109,8 +119,10 @@ public class UpdateBloodlinesConfigPacket
             BloodlinesConfig.FAE_MAX_ARMOR_TIER.set(faeTier);
             BloodlinesConfig.ANGELKIN_MAX_ARMOR_TIER.set(angelkinTier);
             BloodlinesConfig.DEMONKIN_MAX_ARMOR_TIER.set(demonkinTier);
-            BloodlinesConfig.ABILITY_COOLDOWN_SECONDS.set(Mth.clamp(msg.cooldownSeconds, BloodlinesConfig.ABILITY_SECONDS_MIN, BloodlinesConfig.ABILITY_COOLDOWN_MAX));
-            BloodlinesConfig.ABILITY_DURATION_SECONDS.set(Mth.clamp(msg.durationSeconds, BloodlinesConfig.ABILITY_SECONDS_MIN, BloodlinesConfig.ABILITY_DURATION_MAX));
+            BloodlinesConfig.PRIMARY_ABILITY_COOLDOWN_SECONDS.set(Mth.clamp(msg.cooldownSeconds, BloodlinesConfig.ABILITY_SECONDS_MIN, BloodlinesConfig.ABILITY_COOLDOWN_MAX));
+            BloodlinesConfig.PRIMARY_ABILITY_DURATION_SECONDS.set(Mth.clamp(msg.durationSeconds, BloodlinesConfig.ABILITY_SECONDS_MIN, BloodlinesConfig.ABILITY_DURATION_MAX));
+            BloodlinesConfig.SECONDARY_ABILITY_COOLDOWN_SECONDS.set(Mth.clamp(msg.secondaryCooldownSeconds, BloodlinesConfig.ABILITY_SECONDS_MIN, BloodlinesConfig.ABILITY_COOLDOWN_MAX));
+            BloodlinesConfig.SECONDARY_ABILITY_DURATION_SECONDS.set(Mth.clamp(msg.secondaryDurationSeconds, BloodlinesConfig.ABILITY_SECONDS_MIN, BloodlinesConfig.ABILITY_DURATION_MAX));
             BloodlinesConfig.ORB_SPAWN_RARITY_MULTIPLIER.set(Mth.clamp(msg.orbRarityMultiplier, BloodlinesConfig.ORB_RARITY_MULTIPLIER_MIN, BloodlinesConfig.ORB_RARITY_MULTIPLIER_MAX));
             BloodlinesConfig.SPEC.save();
 

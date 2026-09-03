@@ -1,12 +1,18 @@
 package com.harryskingdom.bloodlines.race;
 
 import com.harryskingdom.bloodlines.config.BloodlinesConfig;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LightningBolt;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 
 /** Each starting race's active, cooldown-gated special move. */
 public final class RaceAbility
@@ -20,12 +26,22 @@ public final class RaceAbility
     // each call rather than cached, so an admin's config-screen edit takes effect without a restart.
     public static int cooldownTicks()
     {
-        return 20 * BloodlinesConfig.ABILITY_COOLDOWN_SECONDS.get();
+        return 20 * BloodlinesConfig.PRIMARY_ABILITY_COOLDOWN_SECONDS.get();
     }
 
     public static int durationTicks()
     {
-        return 20 * BloodlinesConfig.ABILITY_DURATION_SECONDS.get();
+        return 20 * BloodlinesConfig.PRIMARY_ABILITY_DURATION_SECONDS.get();
+    }
+
+    public static int secondaryCooldownTicks()
+    {
+        return 20 * BloodlinesConfig.SECONDARY_ABILITY_COOLDOWN_SECONDS.get();
+    }
+
+    public static int secondaryDurationTicks()
+    {
+        return 20 * BloodlinesConfig.SECONDARY_ABILITY_DURATION_SECONDS.get();
     }
 
     /** Display name of this race's primary ability, or null if it doesn't have one yet. */
@@ -34,15 +50,12 @@ public final class RaceAbility
         return switch (race)
         {
             case HUMAN -> "Second Wind";
-            case WOOD_ELF -> "Hunter's Mark";
-            case HIGH_ELF -> "Arcane Surge";
-            case MOON_ELF -> "Umbral Step";
+            case ELF -> "Elven Ward";
             case DWARF -> "Stoneskin";
             case FAE -> "Nature's Blessing";
             case GOBLIN -> "Smoke Bomb";
             case BEASTKIN -> "Feral Howl";
             case REVENANT -> "Siphon";
-            case GHOUL -> "Undying Resolve";
             case DEMON -> "Infernal Wrath";
             case TROLL -> "Regenerate";
             case MERFOLK -> "Tidal Surge";
@@ -51,10 +64,14 @@ public final class RaceAbility
         };
     }
 
-    /** Display name of this race's secondary ability, or null if it doesn't have one. None currently do. */
+    /** Display name of this race's secondary ability, or null if it doesn't have one. */
     public static String secondaryNameFor(Race race)
     {
-        return null;
+        return switch (race)
+        {
+            case ELF -> "Stormcall";
+            default -> null;
+        };
     }
 
     /** Triggers the race's ability effects on the player. Returns false if this race has no ability. */
@@ -67,14 +84,13 @@ public final class RaceAbility
             case HUMAN -> apply(player,
                     new MobEffectInstance(MobEffects.REGENERATION, durationTicks, 1),
                     new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, durationTicks, 0));
-            case WOOD_ELF -> apply(player,
-                    new MobEffectInstance(MobEffects.MOVEMENT_SPEED, durationTicks, 2),
-                    new MobEffectInstance(MobEffects.JUMP, durationTicks, 1));
-            case HIGH_ELF -> apply(player,
-                    new MobEffectInstance(MobEffects.ABSORPTION, durationTicks, 1),
-                    new MobEffectInstance(MobEffects.LUCK, durationTicks, 2));
-            case MOON_ELF -> apply(player,
-                    new MobEffectInstance(MobEffects.INVISIBILITY, durationTicks, 0));
+            // Primary abilities are the effect-buff kind every other race already has; Stormcall (the lightning
+            // strike) lives on the secondary slot instead, reserved for the flashier, non-buff abilities - see
+            // activateSecondary() below. "Elven Ward" leans defensive/sustain to complement Stormcall's own
+            // offense, rather than duplicating it.
+            case ELF -> apply(player,
+                    new MobEffectInstance(MobEffects.REGENERATION, durationTicks, 1),
+                    new MobEffectInstance(MobEffects.ABSORPTION, durationTicks, 0));
             case DWARF -> apply(player,
                     new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, durationTicks, 2));
             // Traced from Medieval Origins Revival's own fae/natures_blessing.json - a nature-themed healing
@@ -102,9 +118,6 @@ public final class RaceAbility
             case REVENANT -> apply(player,
                     new MobEffectInstance(MobEffects.DAMAGE_BOOST, durationTicks, 1),
                     new MobEffectInstance(MobEffects.HEAL, 1, 1));
-            case GHOUL -> apply(player,
-                    new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, durationTicks, 1),
-                    new MobEffectInstance(MobEffects.REGENERATION, durationTicks, 1));
             // Boosts damage for the whole party, not just self - Infernal Wrath rallies everyone nearby, while
             // speed and resistance stay a personal edge. Resistance added at the user's request, to give both
             // winged RARE races (Angelkin/Demonkin) a defensive component in their ability, not just offense.
@@ -132,6 +145,45 @@ public final class RaceAbility
                         new MobEffectInstance(MobEffects.ABSORPTION, durationTicks, 1),
                         new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, durationTicks, 1));
                 applyToNearby(player, MobEffects.HEAL, 1, 1);
+            }
+            default ->
+            {
+                return false;
+            }
+        }
+
+        player.level().playSound(null, player.blockPosition(), SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 1f, 1f);
+        return true;
+    }
+
+    /** Triggers the race's secondary ability effects. Returns false if this race has no secondary ability. */
+    public static boolean activateSecondary(ServerPlayer player, Race race)
+    {
+        switch (race)
+        {
+            // Traced from EAW Origins' own seraphstrider/lightning_active.json (used with the author's
+            // permission) - a raycast along the player's own look direction, real minecraft:lightning_bolt
+            // spawned wherever it lands (a genuine vanilla entity, so it carries its own built-in strike sound
+            // and flash automatically, no custom asset needed), with a firework particle trail along the ray
+            // leading up to it. setCause(player) attributes the strike properly (kill credit, etc.) rather than
+            // it reading as an untriggered natural strike. An instant offensive strike, not a duration/
+            // MobEffectInstance buff - matching its own "call down lightning to smite your enemies" framing,
+            // and why it lives on the secondary slot rather than alongside the primary buff abilities.
+            case ELF ->
+            {
+                HitResult hit = player.pick(20.0, 1.0F, false);
+                Vec3 target = hit.getLocation();
+                ServerLevel level = player.serverLevel();
+
+                level.sendParticles(ParticleTypes.FIREWORK, target.x, target.y, target.z, 30, 0.5, 0.5, 0.5, 0.05);
+
+                LightningBolt bolt = EntityType.LIGHTNING_BOLT.create(level);
+                if (bolt != null)
+                {
+                    bolt.moveTo(target.x, target.y, target.z);
+                    bolt.setCause(player);
+                    level.addFreshEntity(bolt);
+                }
             }
             default ->
             {

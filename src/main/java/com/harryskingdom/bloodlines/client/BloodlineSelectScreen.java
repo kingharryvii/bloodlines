@@ -176,7 +176,7 @@ public class BloodlineSelectScreen extends Screen
 
     /**
      * A vanilla item standing in for real per-race art - picked for thematic fit with each race's flavor and
-     * kit (Wood Elf's bow damage bonus, Dwarf's mining speed, Merfolk's trident, etc.), not just "closest visual
+     * kit (Elf's bow affinity, Dwarf's mining speed, Merfolk's trident, etc.), not just "closest visual
      * match", so the icon still says something true about the race even as a placeholder.
      */
     private static Item iconItemFor(Race race)
@@ -184,16 +184,13 @@ public class BloodlineSelectScreen extends Screen
         return switch (race)
         {
             case HUMAN -> Items.IRON_SWORD;
-            case WOOD_ELF -> Items.BOW;
-            case HIGH_ELF -> Items.ENCHANTED_BOOK;
-            case MOON_ELF -> Items.ENDER_PEARL;
+            case ELF -> Items.BOW;
             case DWARF -> Items.IRON_PICKAXE;
             case FAE -> Items.FEATHER;
-            case GOBLIN -> Items.GOLD_NUGGET;
+            case GOBLIN -> Items.INK_SAC;
             case DRAGONBORN -> Items.DRAGON_EGG;
             case BEASTKIN -> Items.RABBIT_FOOT;
             case REVENANT -> Items.WITHER_ROSE;
-            case GHOUL -> Items.ROTTEN_FLESH;
             case DEMON -> Items.BLAZE_POWDER;
             case TROLL -> Items.MOSS_BLOCK;
             case MERFOLK -> Items.TRIDENT;

@@ -71,8 +71,7 @@ public class BloodlinesClientSetup
                     Race.MERFOLK, new float[] {0.02F, 0.03F, 0.03F, 0.04F, 0.04F, 0.03F, 0.02F}, 0F, true, 0F, 0F, true, true));
             renderer.addLayer(new HeadAccessoryLayer<>(renderer, event.getEntityModels(), HALO, "halo", true, Race.SERAPH));
             renderer.addLayer(new HeadAccessoryLayer<>(renderer, event.getEntityModels(), HORNS, "horns", false, Race.DEMON));
-            renderer.addLayer(new HeadAccessoryLayer<>(renderer, event.getEntityModels(), ELF_EARS, "elf_ears", false,
-                    Race.WOOD_ELF, Race.HIGH_ELF, Race.MOON_ELF));
+            renderer.addLayer(new HeadAccessoryLayer<>(renderer, event.getEntityModels(), ELF_EARS, "elf_ears", false, Race.ELF));
             renderer.addLayer(new HeadAccessoryLayer<>(renderer, event.getEntityModels(), CAT_EARS, "cat_ears", false, Race.BEASTKIN));
         }
     }

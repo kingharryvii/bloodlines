@@ -12,21 +12,35 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobType;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
+import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.entity.projectile.ThrownPotion;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.alchemy.PotionUtils;
+import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.ProjectileImpactEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingEquipmentChangeEvent;
 import net.minecraftforge.event.entity.living.LivingFallEvent;
+import net.minecraftforge.common.ForgeMod;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = BloodlinesMod.MODID)
 public class RaceEffectEvents
@@ -85,8 +99,20 @@ public class RaceEffectEvents
         {
             RaceStats stats = RaceStats.of(race);
 
-            if (event.getSource().getDirectEntity() instanceof AbstractArrow && stats.bowDamageMultiplier() != 0)
-                event.setAmount((float) (event.getAmount() * (1 + stats.bowDamageMultiplier())));
+            if (event.getSource().getDirectEntity() instanceof AbstractArrow arrow)
+            {
+                double projectileBonus = stats.bowDamageMultiplier() + RaceWeaponAffinity.crossbowBonusFor(race, arrow.shotFromCrossbow());
+                if (projectileBonus != 0)
+                    event.setAmount((float) (event.getAmount() * (1 + projectileBonus)));
+            }
+            // Melee weapon affinity - only for a direct hand-to-hand hit (the arrow/bolt case above already
+            // covers the projectile side), so a race's weapon bonus doesn't also creep onto thrown/shot damage.
+            else if (event.getSource().getDirectEntity() == player)
+            {
+                double weaponBonus = RaceWeaponAffinity.bonusFor(race, player.getMainHandItem());
+                if (weaponBonus != 0)
+                    event.setAmount((float) (event.getAmount() * (1 + weaponBonus)));
+            }
 
             if (stats.lifestealPercent() > 0)
                 player.heal((float) (event.getAmount() * stats.lifestealPercent()));
@@ -157,6 +183,77 @@ public class RaceEffectEvents
     }
 
     /**
+     * Beastkin scare creepers away - a predator-instinct nod matching the "animal-blooded" theme (their own
+     * senses read as a threat before a creeper ever gets close enough to fuse). Unlike the undead neutrality
+     * above, there's no "unless attacked first" exception - a creeper doesn't have a retaliation goal the way
+     * undead do (it just walks up and explodes), so there's no equivalent case to carve back out here.
+     */
+    @SubscribeEvent
+    public static void onCreeperTarget(LivingChangeTargetEvent event)
+    {
+        if (!(event.getNewTarget() instanceof ServerPlayer player))
+            return;
+
+        if (!(event.getEntity() instanceof Creeper))
+            return;
+
+        withRace(player, race ->
+        {
+            if (race == Race.BEASTKIN)
+                event.setCanceled(true);
+        });
+    }
+
+    /** Past this range, a sneaking Shadowkin can't be freshly targeted at all - see onStealthTarget below. */
+    private static final double STEALTH_RANGE_SQ = 5.0 * 5.0;
+
+    /**
+     * Zeroes out gravity's contribution while a Merfolk is in water - same ForgeMod.ENTITY_GRAVITY attribute,
+     * and the same add/remove-a-transient-modifier technique, vanilla's own LivingEntity#travel() already uses
+     * for Slow Falling (confirmed by decompile). MULTIPLY_TOTAL at -1.0 always zeroes the attribute's final
+     * value regardless of base, and coexists cleanly with vanilla's own Slow Falling modifier since that one is
+     * ADDITION, not MULTIPLY_TOTAL, so the two never fight over the same operation. Without this, an idle
+     * Merfolk sinks toward the seafloor exactly like a landlubber would - vanilla's own swim movement still
+     * subtracts a small per-tick gravity pull even while submerged (getFluidFallingAdjustedMovement) - which
+     * reads as a natural sea creature not actually being at home in the water. Everything else about swimming
+     * (horizontal movement, Dolphin's Grace-style drag, actively swimming up/down) is untouched - only the
+     * passive downward drift while otherwise idle goes away.
+     */
+    private static final AttributeModifier MERFOLK_BUOYANCY = new AttributeModifier(
+            UUID.fromString("6a3f9b2e-6c2b-4a3a-8a7d-0e6c1b8f2a4d"), "Merfolk buoyancy", -1.0, AttributeModifier.Operation.MULTIPLY_TOTAL);
+
+    /**
+     * Shadowkin's "Unseen" - hostile mobs have a much harder time noticing you while sneaking, past melee
+     * range; get close while crawling and you can still be spotted, same as vanilla sneaking already reduces
+     * detection without erasing it outright. Standing up makes you visible to searches again immediately.
+     * Doesn't interrupt an already-engaged fight - a mob that already has this player as its own
+     * Mob#getLastHurtByMob() (the same "already retaliating" read the undead-neutrality handler above uses)
+     * keeps its target rather than an ambush suddenly going unnoticed mid-fight - and boss mobs are excluded
+     * outright so a boss fight can't be cheesed by crouching.
+     */
+    @SubscribeEvent
+    public static void onStealthTarget(LivingChangeTargetEvent event)
+    {
+        if (!(event.getNewTarget() instanceof ServerPlayer player) || !player.isCrouching())
+            return;
+
+        if (event.getEntity() instanceof WitherBoss || event.getEntity() instanceof EnderDragon)
+            return;
+
+        if (event.getEntity() instanceof Mob mob && mob.getLastHurtByMob() == player)
+            return;
+
+        if (event.getEntity().distanceToSqr(player) <= STEALTH_RANGE_SQ)
+            return;
+
+        withRace(player, race ->
+        {
+            if (race == Race.GOBLIN)
+                event.setCanceled(true);
+        });
+    }
+
+    /**
      * "Need for Mobility" - Fae, Angelkin and Demonkin can't wear armor heavier than the configured tier (wings
      * need freedom of movement). Reacts to the equip rather than blocking it outright, same technique used by
      * every other "race can't use X" mod: LivingEquipmentChangeEvent fires after the swap already happened, so a
@@ -204,6 +301,45 @@ public class RaceEffectEvents
         });
     }
 
+    /**
+     * Elf potion affinity - a thrown splash/lingering potion's effects last 25% longer when an Elf threw it.
+     * Fires before ThrownPotion#onHit() reads the item's effects (ProjectileImpactEvent fires at the top of
+     * Projectile#onHit(), confirmed by decompile, ahead of ThrownPotion's own onHit() override that calls
+     * PotionUtils.getMobEffects(this.getItem()) to decide what to apply), so replacing the entity's item here
+     * changes what actually lands. PotionUtils.getMobEffects() already merges the base potion type's own
+     * effects together with any custom ones into one list - re-flattening that merged, duration-boosted list
+     * back onto the stack as custom effects while resetting the potion type to Potions.EMPTY (so
+     * getAllEffects() doesn't also re-add the original, unboosted base-potion effects on top) avoids the
+     * result carrying the same effects twice.
+     */
+    @SubscribeEvent
+    public static void onPotionImpact(ProjectileImpactEvent event)
+    {
+        if (!(event.getEntity() instanceof ThrownPotion potion))
+            return;
+
+        if (!(potion.getOwner() instanceof ServerPlayer player))
+            return;
+
+        withRace(player, race ->
+        {
+            if (race != Race.ELF)
+                return;
+
+            List<MobEffectInstance> boosted = new ArrayList<>();
+            for (MobEffectInstance effect : PotionUtils.getMobEffects(potion.getItem()))
+            {
+                boosted.add(new MobEffectInstance(effect.getEffect(), (int) (effect.getDuration() * 1.25),
+                        effect.getAmplifier(), effect.isAmbient(), effect.isVisible(), effect.showIcon()));
+            }
+
+            ItemStack boostedStack = potion.getItem().copy();
+            PotionUtils.setPotion(boostedStack, Potions.EMPTY);
+            PotionUtils.setCustomEffects(boostedStack, boosted);
+            potion.setItem(boostedStack);
+        });
+    }
+
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent event)
     {
@@ -235,6 +371,51 @@ public class RaceEffectEvents
                 }
                 else
                     player.removeEffect(MobEffects.NIGHT_VISION);
+
+                AttributeInstance gravity = player.getAttribute(ForgeMod.ENTITY_GRAVITY.get());
+                if (gravity != null)
+                {
+                    if (player.isInWater())
+                    {
+                        if (!gravity.hasModifier(MERFOLK_BUOYANCY))
+                            gravity.addTransientModifier(MERFOLK_BUOYANCY);
+                    }
+                    else if (gravity.hasModifier(MERFOLK_BUOYANCY))
+                        gravity.removeModifier(MERFOLK_BUOYANCY);
+                }
+
+                // Belt-and-suspenders on top of the gravity modifier above: floors any residual downward
+                // velocity to 0 rather than trusting the attribute alone to reach exactly zero every tick (the
+                // gravity fix still visibly left a very slow sink in testing, and setDeltaMovement() here is
+                // itself synced back to the client the same way server-driven knockback/explosions already are,
+                // so this reliably corrects it rather than fighting client-side prediction). Skipped while
+                // crouching - crouch-to-dive is the same intentional "swim downward" input vanilla's own water
+                // controls use, so a Merfolk actively diving still sinks exactly as fast as they choose to.
+                if (player.isInWater() && !player.isCrouching() && player.getDeltaMovement().y < 0)
+                {
+                    Vec3 velocity = player.getDeltaMovement();
+                    player.setDeltaMovement(velocity.x, 0, velocity.z);
+                }
+            }
+
+            // Demonkin move noticeably faster through lava than vanilla's own thick, wading-speed crawl - not a
+            // real swim mechanic (confirmed by decompiling LivingEntity's own fluid movement dispatch: it
+            // explicitly skips moveInFluid(), the method that handles water's swim-style movement, whenever the
+            // fluid type is lava - lava is a deliberately separate, slower code path in vanilla/Forge, not just
+            // water with a bigger drag constant, so there's no "Dolphin's Grace for lava" to lean on). This tops
+            // horizontal speed up to roughly normal walking speed whenever lava's own drag has dragged it below
+            // that, every tick, rather than granting true swimming.
+            if (race == Race.DEMON && player.isInLava())
+            {
+                Vec3 velocity = player.getDeltaMovement();
+                double horizontalSpeed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+                double targetSpeed = player.getAttributeValue(Attributes.MOVEMENT_SPEED);
+
+                if (horizontalSpeed > 0 && horizontalSpeed < targetSpeed)
+                {
+                    double scale = targetSpeed / horizontalSpeed;
+                    player.setDeltaMovement(velocity.x * scale, velocity.y, velocity.z * scale);
+                }
             }
         });
     }

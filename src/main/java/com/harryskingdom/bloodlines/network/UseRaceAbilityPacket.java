@@ -66,7 +66,7 @@ public class UseRaceAbilityPacket
                 {
                     RaceAbilityCooldowns.markUsed(player);
                     player.sendSystemMessage(Component.literal(abilityName + "!").withStyle(ChatFormatting.AQUA));
-                    BloodlinesNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new AbilityActivatedPacket());
+                    BloodlinesNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new AbilityActivatedPacket(false));
                 }
             }));
         });
@@ -75,11 +75,25 @@ public class UseRaceAbilityPacket
 
     private static void handleSecondary(ServerPlayer player, com.harryskingdom.bloodlines.race.Race race)
     {
-        // No race currently has a secondary ability - this is a stub for when one does.
         String secondaryName = RaceAbility.secondaryNameFor(race);
         if (secondaryName == null)
         {
             player.sendSystemMessage(Component.literal("This bloodline has no secondary ability.").withStyle(ChatFormatting.GRAY));
+            return;
+        }
+
+        if (!RaceAbilityCooldowns.isSecondaryReady(player, RaceAbility.secondaryCooldownTicks()))
+        {
+            int seconds = RaceAbilityCooldowns.secondaryTicksRemaining(player, RaceAbility.secondaryCooldownTicks()) / 20;
+            player.sendSystemMessage(Component.literal(secondaryName + " is on cooldown (" + seconds + "s).").withStyle(ChatFormatting.RED));
+            return;
+        }
+
+        if (RaceAbility.activateSecondary(player, race))
+        {
+            RaceAbilityCooldowns.markSecondaryUsed(player);
+            player.sendSystemMessage(Component.literal(secondaryName + "!").withStyle(ChatFormatting.AQUA));
+            BloodlinesNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new AbilityActivatedPacket(true));
         }
     }
 }

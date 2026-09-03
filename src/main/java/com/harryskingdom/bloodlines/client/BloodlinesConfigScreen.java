@@ -76,6 +76,8 @@ public final class BloodlinesConfigScreen extends Screen
     private EditBox flySpeedBox;
     private EditBox cooldownBox;
     private EditBox durationBox;
+    private EditBox secondaryCooldownBox;
+    private EditBox secondaryDurationBox;
     private EditBox orbRarityBox;
     private CycleButton<BloodlinesConfig.MaxArmorTier> faeArmorTierButton;
     private CycleButton<BloodlinesConfig.MaxArmorTier> angelkinArmorTierButton;
@@ -135,8 +137,10 @@ public final class BloodlinesConfigScreen extends Screen
         addRow("Fae max armor tier", addArmorTierButton(fieldX, BloodlinesConfig.FAE_MAX_ARMOR_TIER.get(), editable));
         addRow("Angelkin max armor tier", addArmorTierButton(fieldX, BloodlinesConfig.ANGELKIN_MAX_ARMOR_TIER.get(), editable));
         addRow("Demonkin max armor tier", addArmorTierButton(fieldX, BloodlinesConfig.DEMONKIN_MAX_ARMOR_TIER.get(), editable));
-        addRow("Ability cooldown (seconds)", addField(fieldX, String.valueOf(BloodlinesConfig.ABILITY_COOLDOWN_SECONDS.get()), editable));
-        addRow("Ability duration (seconds)", addField(fieldX, String.valueOf(BloodlinesConfig.ABILITY_DURATION_SECONDS.get()), editable));
+        addRow("Primary cooldown (s)", addField(fieldX, String.valueOf(BloodlinesConfig.PRIMARY_ABILITY_COOLDOWN_SECONDS.get()), editable));
+        addRow("Primary duration (s)", addField(fieldX, String.valueOf(BloodlinesConfig.PRIMARY_ABILITY_DURATION_SECONDS.get()), editable));
+        addRow("Secondary cooldown (s)", addField(fieldX, String.valueOf(BloodlinesConfig.SECONDARY_ABILITY_COOLDOWN_SECONDS.get()), editable));
+        addRow("Secondary duration (s)", addField(fieldX, String.valueOf(BloodlinesConfig.SECONDARY_ABILITY_DURATION_SECONDS.get()), editable));
         addRow("Orb of Bloodlines spawn rarity", addField(fieldX, String.valueOf(BloodlinesConfig.ORB_SPAWN_RARITY_MULTIPLIER.get()), editable));
 
         // Fields above are assigned in addRow() call order, matching this declaration order.
@@ -148,7 +152,9 @@ public final class BloodlinesConfigScreen extends Screen
         demonkinArmorTierButton = castArmorButton(rows.get(5).widget());
         cooldownBox = (EditBox) rows.get(6).widget();
         durationBox = (EditBox) rows.get(7).widget();
-        orbRarityBox = (EditBox) rows.get(8).widget();
+        secondaryCooldownBox = (EditBox) rows.get(8).widget();
+        secondaryDurationBox = (EditBox) rows.get(9).widget();
+        orbRarityBox = (EditBox) rows.get(10).widget();
 
         buttonY = height - BOTTOM_BUTTON_HEIGHT - BOTTOM_SCREEN_MARGIN;
         viewportTop = TOP_MARGIN;
@@ -241,6 +247,8 @@ public final class BloodlinesConfigScreen extends Screen
             double flySpeed = clamp(Double.parseDouble(flySpeedBox.getValue().trim()), BloodlinesConfig.FAE_FLY_SPEED_MIN, BloodlinesConfig.FAE_FLY_SPEED_MAX);
             int cooldown = clamp(Integer.parseInt(cooldownBox.getValue().trim()), BloodlinesConfig.ABILITY_SECONDS_MIN, BloodlinesConfig.ABILITY_COOLDOWN_MAX);
             int duration = clamp(Integer.parseInt(durationBox.getValue().trim()), BloodlinesConfig.ABILITY_SECONDS_MIN, BloodlinesConfig.ABILITY_DURATION_MAX);
+            int secondaryCooldown = clamp(Integer.parseInt(secondaryCooldownBox.getValue().trim()), BloodlinesConfig.ABILITY_SECONDS_MIN, BloodlinesConfig.ABILITY_COOLDOWN_MAX);
+            int secondaryDuration = clamp(Integer.parseInt(secondaryDurationBox.getValue().trim()), BloodlinesConfig.ABILITY_SECONDS_MIN, BloodlinesConfig.ABILITY_DURATION_MAX);
             double orbRarity = clamp(Double.parseDouble(orbRarityBox.getValue().trim()), BloodlinesConfig.ORB_RARITY_MULTIPLIER_MIN, BloodlinesConfig.ORB_RARITY_MULTIPLIER_MAX);
             BloodlinesConfig.MaxArmorTier faeTier = faeArmorTierButton.getValue();
             BloodlinesConfig.MaxArmorTier angelkinTier = angelkinArmorTierButton.getValue();
@@ -250,7 +258,8 @@ public final class BloodlinesConfigScreen extends Screen
             // for a remote op, it's also what makes the post-save broadcast (which fixes stale cached values on
             // every client, including this one) apply uniformly instead of needing a separate host-only path.
             BloodlinesNetwork.CHANNEL.sendToServer(new UpdateBloodlinesConfigPacket(
-                    foodLevel, exhaustion, flySpeed, faeTier, angelkinTier, demonkinTier, cooldown, duration, orbRarity));
+                    foodLevel, exhaustion, flySpeed, faeTier, angelkinTier, demonkinTier,
+                    cooldown, duration, secondaryCooldown, secondaryDuration, orbRarity));
 
             onClose();
         }

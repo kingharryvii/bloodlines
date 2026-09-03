@@ -33,8 +33,10 @@ public final class BloodlinesConfig
     public static final ForgeConfigSpec.EnumValue<MaxArmorTier> FAE_MAX_ARMOR_TIER;
     public static final ForgeConfigSpec.EnumValue<MaxArmorTier> ANGELKIN_MAX_ARMOR_TIER;
     public static final ForgeConfigSpec.EnumValue<MaxArmorTier> DEMONKIN_MAX_ARMOR_TIER;
-    public static final ForgeConfigSpec.IntValue ABILITY_COOLDOWN_SECONDS;
-    public static final ForgeConfigSpec.IntValue ABILITY_DURATION_SECONDS;
+    public static final ForgeConfigSpec.IntValue PRIMARY_ABILITY_COOLDOWN_SECONDS;
+    public static final ForgeConfigSpec.IntValue PRIMARY_ABILITY_DURATION_SECONDS;
+    public static final ForgeConfigSpec.IntValue SECONDARY_ABILITY_COOLDOWN_SECONDS;
+    public static final ForgeConfigSpec.IntValue SECONDARY_ABILITY_DURATION_SECONDS;
     public static final ForgeConfigSpec.DoubleValue ORB_SPAWN_RARITY_MULTIPLIER;
 
     static
@@ -71,14 +73,28 @@ public final class BloodlinesConfig
                 .defineEnum("demonkinMaxArmorTier", MaxArmorTier.CHAIN);
 
         BUILDER.pop();
-        BUILDER.comment("The one active, cooldown-gated special move every race has (see RaceAbility).").push("ability");
+        // Primary and secondary cool down independently (see RaceAbilityCooldowns) - separate config values so an
+        // admin can tune the buff-style primary (every race has one) and the flashier secondary (currently Elf's
+        // Stormcall only) without one setting forcing the other's pace.
+        BUILDER.comment("The primary active ability every race has (see RaceAbility#activate).").push("primary_ability");
 
-        ABILITY_COOLDOWN_SECONDS = BUILDER
-                .comment("Seconds between uses of a race's active ability.")
+        PRIMARY_ABILITY_COOLDOWN_SECONDS = BUILDER
+                .comment("Seconds between uses of a race's primary ability.")
                 .defineInRange("cooldownSeconds", 45, ABILITY_SECONDS_MIN, ABILITY_COOLDOWN_MAX);
 
-        ABILITY_DURATION_SECONDS = BUILDER
-                .comment("Seconds the ability's effects last once activated.")
+        PRIMARY_ABILITY_DURATION_SECONDS = BUILDER
+                .comment("Seconds the primary ability's effects last once activated.")
+                .defineInRange("durationSeconds", 10, ABILITY_SECONDS_MIN, ABILITY_DURATION_MAX);
+
+        BUILDER.pop();
+        BUILDER.comment("The secondary active ability some races have (see RaceAbility#activateSecondary) - currently Elf's Stormcall.").push("secondary_ability");
+
+        SECONDARY_ABILITY_COOLDOWN_SECONDS = BUILDER
+                .comment("Seconds between uses of a race's secondary ability.")
+                .defineInRange("cooldownSeconds", 45, ABILITY_SECONDS_MIN, ABILITY_COOLDOWN_MAX);
+
+        SECONDARY_ABILITY_DURATION_SECONDS = BUILDER
+                .comment("Seconds the secondary ability's effects last once activated, for any secondary ability that has a duration (Stormcall itself is instant and ignores this).")
                 .defineInRange("durationSeconds", 10, ABILITY_SECONDS_MIN, ABILITY_DURATION_MAX);
 
         BUILDER.pop();

@@ -12,12 +12,14 @@ import net.minecraftforge.client.gui.overlay.ForgeGui;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 
 /**
- * Two small bars next to the hotbar for the local player's racial ability, at the user's request - modeled on
- * Medieval Origins Revival's own ability HUD. The top bar is the cooldown: empty the instant you use it, fills
- * left-to-right as RaceAbility.cooldownTicks() elapses, full again once ready. The bottom bar is the active
- * duration: full the instant you use it, drains to empty over RaceAbility.durationTicks() - only relevant while
- * the ability's effects are actually still ticking, so it's hidden once it hits zero rather than sitting there
- * permanently empty.
+ * Small bars next to the hotbar for the local player's racial abilities, at the user's request - modeled on
+ * Medieval Origins Revival's own ability HUD. Primary always renders (every race has one); secondary renders
+ * its own separate, independently-labeled bar-pair stacked above it whenever the race has one (currently only
+ * Elf's Stormcall) - each reads its own AbilityHudState clock, so using one never moves the other's bar. Per
+ * pair, the top bar is the cooldown: empty the instant you use it, fills left-to-right as the relevant
+ * cooldownTicks() elapses, full again once ready. The bottom bar is the active duration: full the instant you
+ * use it, drains to empty over the relevant durationTicks() - only relevant while the ability's effects are
+ * actually still ticking, so it's hidden once it hits zero rather than sitting there permanently empty.
  */
 public final class AbilityCooldownOverlay implements IGuiOverlay
 {
@@ -26,6 +28,7 @@ public final class AbilityCooldownOverlay implements IGuiOverlay
     private static final int BAR_GAP = 2;
     private static final int HOTBAR_HALF_WIDTH = 91;
     private static final int RIGHT_GAP = 8;
+    private static final int SECTION_GAP = 6;
 
     private static final int COLOR_BORDER = 0xFF000000;
     private static final int COLOR_BG = 0xB0202020;
@@ -44,25 +47,40 @@ public final class AbilityCooldownOverlay implements IGuiOverlay
         if (race == null)
             return;
 
-        String abilityName = RaceAbility.nameFor(race);
-        if (abilityName == null)
+        String primaryName = RaceAbility.nameFor(race);
+        String secondaryName = RaceAbility.secondaryNameFor(race);
+        if (primaryName == null && secondaryName == null)
             return;
 
         int x = screenWidth / 2 + HOTBAR_HALF_WIDTH + RIGHT_GAP;
         int y = screenHeight - 29;
+        int sectionHeight = mc.font.lineHeight + 2 + BAR_HEIGHT * 2 + BAR_GAP + SECTION_GAP;
 
         RenderSystem.enableBlend();
 
-        graphics.drawString(mc.font, abilityName, x, y - mc.font.lineHeight - 2, 0xFFFFFFFF);
+        if (secondaryName != null)
+        {
+            renderAbility(graphics, mc, x, y - sectionHeight, secondaryName,
+                    AbilityHudState.cooldownProgress(true), AbilityHudState.durationProgress(true));
+        }
 
-        float cooldown = AbilityHudState.cooldownProgress();
-        drawBar(graphics, x, y, cooldown, COLOR_COOLDOWN_FILL);
-
-        float duration = AbilityHudState.durationProgress();
-        if (duration > 0F)
-            drawBar(graphics, x, y + BAR_HEIGHT + BAR_GAP, duration, COLOR_DURATION_FILL);
+        if (primaryName != null)
+        {
+            renderAbility(graphics, mc, x, y, primaryName,
+                    AbilityHudState.cooldownProgress(false), AbilityHudState.durationProgress(false));
+        }
 
         RenderSystem.disableBlend();
+    }
+
+    private static void renderAbility(GuiGraphics graphics, Minecraft mc, int x, int y, String name, float cooldown, float duration)
+    {
+        graphics.drawString(mc.font, name, x, y - mc.font.lineHeight - 2, 0xFFFFFFFF);
+
+        drawBar(graphics, x, y, cooldown, COLOR_COOLDOWN_FILL);
+
+        if (duration > 0F)
+            drawBar(graphics, x, y + BAR_HEIGHT + BAR_GAP, duration, COLOR_DURATION_FILL);
     }
 
     private static void drawBar(GuiGraphics graphics, int x, int y, float progress, int fillColor)

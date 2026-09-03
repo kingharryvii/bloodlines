@@ -57,17 +57,20 @@ screen (`BloodlineSelectScreen`'s race list filters it out by name).
 
 | Race | Tail/ears/etc | Flight | Notes |
 |---|---|---|---|
-| Human, Wood Elf, High Elf, Moon Elf, Dwarf, Goblin | — | — | Dwarf is 0.85x height (Pehkui) |
+| Demi-Human (HUMAN in code), Dwarf, Goblin | — | — | Dwarf is 0.85x height (Pehkui) |
 | Fae | — | Native (Abilities.flying, hunger-gated) | 0.66x height+width (Pehkui), butterfly wings via `FaeWingsLayer` (vanilla `ElytraLayer` reused with a custom texture) |
-| Beastkin | Fur tail + cat ears | — | Tail uses the OLD `anchorToBody=false` positioning (see "Known issues" below) |
-| Revenant, Ghoul | — | — | |
+| Beastkin | Fur tail + cat ears | — | Tail uses the OLD `anchorToBody=false` positioning (see "Known issues" below). Absorbed the old Feline race. |
+| Elf | Elf ears | — | Absorbed Wood/High/Moon Elf - see `PlayerRaceProvider#tryParseRace` for the save-data migration |
+| Revenant | — | — | |
 | Demonkin | Horns | Icarus (`RED_DRAGON_WINGS`) | Health +3 |
-| Troll | — | — | 1.2x height, 1.15x width (Pehkui) |
+| Ogre (TROLL in code) | — | — | 1.2x height, 1.15x width (Pehkui) |
 | Merfolk | Real mermaid tail, water-gated | — | See "The Merfolk tail" below — this took the bulk of the session |
 | Angelkin (SERAPH in code) | Halo | Icarus (`WHITE_FEATHERED_WINGS`) | |
 
-Elf ears (Wood/High/Moon Elf) and cat ears (Beastkin) share `HeadAccessoryModel`/`HeadAccessoryLayer`
-with the halo/horns.
+Elf ears (Elf) and cat ears (Beastkin) share `HeadAccessoryModel`/`HeadAccessoryLayer` with the
+halo/horns. Ghoul was removed entirely (deemed redundant with Revenant) - no save-data migration
+exists for it, so an existing Ghoul save falls through to unrecognized-race handling and lands the
+player back on race-selection.
 
 ## Architecture
 
