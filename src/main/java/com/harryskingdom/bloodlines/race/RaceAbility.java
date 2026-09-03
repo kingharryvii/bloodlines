@@ -90,10 +90,15 @@ public final class RaceAbility
             case GOBLIN -> apply(player,
                     new MobEffectInstance(MobEffects.INVISIBILITY, durationTicks, 0),
                     new MobEffectInstance(MobEffects.MOVEMENT_SPEED, durationTicks, 1));
+            // Jump Boost IV added alongside the existing damage/speed/resistance kit - Beastkin's own innate
+            // Jump I (RaceEffects, always-on) was the only jump anything on this race, while Angelkin's ability
+            // granted a bigger jump than the actual leaping-predator race did. Matches Angelkin's ability-level
+            // jump rather than exceeding it, at the user's request - see git history if that balance call changes.
             case BEASTKIN -> apply(player,
                     new MobEffectInstance(MobEffects.DAMAGE_BOOST, durationTicks, 1),
                     new MobEffectInstance(MobEffects.MOVEMENT_SPEED, durationTicks, 1),
-                    new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, durationTicks, 0));
+                    new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, durationTicks, 0),
+                    new MobEffectInstance(MobEffects.JUMP, durationTicks, 3));
             case REVENANT -> apply(player,
                     new MobEffectInstance(MobEffects.DAMAGE_BOOST, durationTicks, 1),
                     new MobEffectInstance(MobEffects.HEAL, 1, 1));
@@ -101,10 +106,13 @@ public final class RaceAbility
                     new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, durationTicks, 1),
                     new MobEffectInstance(MobEffects.REGENERATION, durationTicks, 1));
             // Boosts damage for the whole party, not just self - Infernal Wrath rallies everyone nearby, while
-            // the speed stays a personal edge.
+            // speed and resistance stay a personal edge. Resistance added at the user's request, to give both
+            // winged RARE races (Angelkin/Demonkin) a defensive component in their ability, not just offense.
             case DEMON ->
             {
-                apply(player, new MobEffectInstance(MobEffects.MOVEMENT_SPEED, durationTicks, 1));
+                apply(player,
+                        new MobEffectInstance(MobEffects.MOVEMENT_SPEED, durationTicks, 1),
+                        new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, durationTicks, 1));
                 applyToNearby(player, MobEffects.DAMAGE_BOOST, durationTicks, 1);
             }
             case TROLL -> apply(player,
@@ -114,13 +122,15 @@ public final class RaceAbility
                     new MobEffectInstance(MobEffects.MOVEMENT_SPEED, durationTicks, 1),
                     new MobEffectInstance(MobEffects.JUMP, durationTicks, 1));
             // Heals the whole party, not just self - a diving strike that doubles as a rally point, the personal
-            // combat effects (jump/damage/shield) stay self-only.
+            // combat effects (damage/shield/resistance) stay self-only. Jump Boost IV swapped for Resistance II
+            // at the user's request - having the biggest jump in the game on the one race that already flies,
+            // while Beastkin (the actual leaping-predator race) had none in its own ability, didn't sit right.
             case SERAPH ->
             {
                 apply(player,
-                        new MobEffectInstance(MobEffects.JUMP, durationTicks, 3),
                         new MobEffectInstance(MobEffects.DAMAGE_BOOST, durationTicks, 1),
-                        new MobEffectInstance(MobEffects.ABSORPTION, durationTicks, 1));
+                        new MobEffectInstance(MobEffects.ABSORPTION, durationTicks, 1),
+                        new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, durationTicks, 1));
                 applyToNearby(player, MobEffects.HEAL, 1, 1);
             }
             default ->

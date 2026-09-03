@@ -51,12 +51,13 @@ public final class RacePowers
                     new RacePower("True Flight", "Real, sustained flight on delicate wings.", POSITIVE),
                     new RacePower("Featherfall", "Never takes fall damage - drifts down gently instead.", NEUTRAL),
                     new RacePower("Lucky Dust", "+2 luck.", POSITIVE),
-                    new RacePower("Hollow Bones", "-6 max health, -1 melee damage - the frailest bloodline.", NEGATIVE),
+                    new RacePower("Hollow Bones", "-4 max health, -1 melee damage - the frailest bloodline.", NEGATIVE),
                     new RacePower("Need for Mobility", "Armor restrictions apply - wings need freedom of movement.", NEGATIVE),
                     new RacePower("Nature's Blessing", "Ability: regeneration for you and nearby allies.", NEUTRAL)
             )),
             Map.entry(Race.GOBLIN, List.of(
                     new RacePower("Lucky Scavenger", "+2 luck.", POSITIVE),
+                    new RacePower("Quick of Hand", "+10% movement speed, +10% attack speed.", POSITIVE),
                     new RacePower("Tunnel Rat", "+30% mining speed.", POSITIVE),
                     new RacePower("Weak Grip", "-1 melee damage, -2 max health.", NEGATIVE),
                     new RacePower("Smoke Bomb", "Ability: invisibility and a burst of speed to escape.", NEUTRAL)
@@ -67,19 +68,20 @@ public final class RacePowers
                     new RacePower("Sure-Footed", "Takes 50% less fall damage, and knockback resistance.", POSITIVE),
                     new RacePower("Moonlit Eyes", "Full night vision.", NEUTRAL),
                     new RacePower("Clumsy Hands", "-10% mining speed.", NEGATIVE),
-                    new RacePower("Feral Howl", "Ability: damage, speed and resistance.", NEUTRAL)
+                    new RacePower("Feral Howl", "Ability: damage, speed, resistance, and a huge leap.", NEUTRAL)
             )),
             Map.entry(Race.REVENANT, List.of(
                     new RacePower("Hungers For More", "Heals for 25% of all damage dealt.", POSITIVE),
-                    new RacePower("Grave-Quick", "+10% movement speed, +15% attack speed.", POSITIVE),
-                    new RacePower("Kindred of the Grave", "Hostile undead mobs won't target you.", NEUTRAL),
+                    new RacePower("Grave-Quick", "+10% movement speed, +10% attack speed.", POSITIVE),
+                    new RacePower("Kindred of the Grave", "Hostile undead mobs leave you alone - draw blood on one, and its kind nearby turns on you too.", NEUTRAL),
                     new RacePower("Wasting Flesh", "-2 max health.", NEGATIVE),
+                    new RacePower("Cursed Luck", "-1 luck.", NEGATIVE),
                     new RacePower("Siphon", "Ability: a damage boost and an instant heal.", NEUTRAL)
             )),
             Map.entry(Race.GHOUL, List.of(
                     new RacePower("Undying Endurance", "+4 max health, never takes fall damage.", POSITIVE),
                     new RacePower("Iron Grip", "+1 melee damage and knockback resistance.", POSITIVE),
-                    new RacePower("Grave Sight", "Full night vision; hostile undead mobs won't target you.", NEUTRAL),
+                    new RacePower("Grave Sight", "Full night vision; hostile undead mobs leave you alone - draw blood on one, and its kind nearby turns on you too.", NEUTRAL),
                     new RacePower("Shambling Gait", "-10% movement speed.", NEGATIVE),
                     new RacePower("Cursed Luck", "-1 luck.", NEGATIVE),
                     new RacePower("Undying Resolve", "Ability: damage resistance and regeneration.", NEUTRAL)
@@ -87,22 +89,26 @@ public final class RacePowers
             Map.entry(Race.DEMON, List.of(
                     new RacePower("Winged", "Real, sustained flight.", POSITIVE),
                     new RacePower("Hellborne", "Fully immune to fire and lava.", NEUTRAL),
-                    new RacePower("Infernal Might", "+2 melee damage, +10% attack speed, +2 max health.", POSITIVE),
+                    new RacePower("Infernal Might", "+2 melee damage, +10% attack speed, +3 max health.", POSITIVE),
                     new RacePower("Nightsight", "Full night vision.", NEUTRAL),
                     new RacePower("Sure Wings", "Takes 60% less fall damage.", POSITIVE),
+                    new RacePower("Infernal Curse", "-1 luck, -10% mining speed.", NEGATIVE),
                     new RacePower("Need for Mobility", "Armor restrictions apply - wings need freedom of movement.", NEGATIVE),
-                    new RacePower("Infernal Wrath", "Ability: a damage boost for you and nearby allies, plus a burst of speed for you.", NEUTRAL)
+                    new RacePower("Infernal Wrath", "Ability: a damage boost for you and nearby allies, plus a burst of speed and resistance for you.", NEUTRAL)
             )),
             Map.entry(Race.TROLL, List.of(
-                    new RacePower("Ancient Hide", "+8 max health - the toughest of any bloodline.", POSITIVE),
-                    new RacePower("Crushing Blows", "+3 melee damage and strong knockback resistance.", POSITIVE),
+                    new RacePower("Ancient Hide", "+7 max health - the toughest of any bloodline.", POSITIVE),
+                    new RacePower("Crushing Blows", "+2 melee damage and strong knockback resistance.", POSITIVE),
                     new RacePower("Stone Fists", "+20% mining speed.", POSITIVE),
                     new RacePower("Lumbering", "-15% movement speed, -15% attack speed.", NEGATIVE),
                     new RacePower("Regenerate", "Ability: regeneration and damage resistance.", NEUTRAL)
             )),
             Map.entry(Race.MERFOLK, List.of(
                     new RacePower("Born of the Tide", "Breathes underwater and swims freely - at home in the depths.", POSITIVE),
+                    new RacePower("Deep Delver", "Mines at full speed underwater, as if Aqua Affinity were built in.", POSITIVE),
+                    new RacePower("Keen Depths", "Clear underwater vision, like Night Vision, while submerged.", POSITIVE),
                     new RacePower("Sea's Fortune", "+1 luck.", POSITIVE),
+                    new RacePower("Trident's Edge", "+1 melee damage, +10% attack speed.", POSITIVE),
                     new RacePower("Depths' Strength", "Knockback resistance, even on land.", POSITIVE),
                     new RacePower("Out of Your Depth", "-5% movement speed on land.", NEGATIVE),
                     new RacePower("Tidal Surge", "Ability: a burst of speed and jump height.", NEUTRAL)
@@ -110,10 +116,10 @@ public final class RacePowers
             Map.entry(Race.SERAPH, List.of(
                     new RacePower("Angel Wings", "Real, sustained flight on white feathered wings.", POSITIVE),
                     new RacePower("Protective Wings", "Takes 60% less fall damage.", POSITIVE),
-                    new RacePower("Holy Vigor", "+4 max health, +2 melee damage, +2 luck.", POSITIVE),
+                    new RacePower("Holy Vigor", "+3 max health, +2 melee damage, +2 luck.", POSITIVE),
                     new RacePower("Heavy of Wing", "-10% movement speed, -20% mining speed.", NEGATIVE),
                     new RacePower("Need for Mobility", "Armor restrictions apply - wings need freedom of movement.", NEGATIVE),
-                    new RacePower("Divine Descent", "Ability: heals you and nearby allies, plus a jump, damage boost and shield for you.", NEUTRAL)
+                    new RacePower("Divine Descent", "Ability: heals you and nearby allies, plus a damage boost, shield and resistance for you.", NEUTRAL)
             )),
             Map.entry(Race.DRAGONBORN, List.of(
                     new RacePower("Sealed Blood", "Locked until the Dragon Shrine is discovered and its power awakened.", NEUTRAL)

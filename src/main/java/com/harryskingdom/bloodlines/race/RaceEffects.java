@@ -36,14 +36,22 @@ public final class RaceEffects
         setModifier(player, Attributes.LUCK, LUCK_ID, stats.luckBonus(), AttributeModifier.Operation.ADDITION);
         setModifier(player, Attributes.ATTACK_SPEED, ATTACK_SPEED_ID, stats.attackSpeedMultiplier(), AttributeModifier.Operation.MULTIPLY_TOTAL);
 
-        setInnateEffect(player, MobEffects.NIGHT_VISION, stats.nightVision());
+        boolean passiveVisuals = passiveVisualsEnabled(player);
+
+        // Only the two screen-changing effects respect the toggle - night vision tints/brightens the whole
+        // screen, slow falling changes how falling itself looks and feels. Water breathing, fire resistance etc.
+        // are purely mechanical (no drowning meter, no burn damage) with nothing to look at, so there's nothing
+        // for a player to want turned off there.
+        setInnateEffect(player, MobEffects.NIGHT_VISION, stats.nightVision() && passiveVisuals);
         setInnateEffect(player, MobEffects.FIRE_RESISTANCE, stats.fireResistant());
-        setInnateEffect(player, MobEffects.SLOW_FALLING, stats.slowFalling());
+        setInnateEffect(player, MobEffects.SLOW_FALLING, stats.slowFalling() && passiveVisuals);
         setInnateEffect(player, MobEffects.WATER_BREATHING, stats.aquatic());
         setInnateEffect(player, MobEffects.DOLPHINS_GRACE, stats.aquatic());
         // Beastkin only - a sure-footed, climbing-adjacent nod. There's no clean "can climb walls" stat to add
         // to RaceStats for this, so it's a direct race check rather than a new field just one race would ever use.
-        setInnateEffect(player, MobEffects.JUMP, race == Race.BEASTKIN);
+        // Amplifier 1 (Jump Boost II) - a direct jump-velocity override matching this same number was tried
+        // first and still couldn't reliably climb a 2-block stack in testing, so back to the real potion effect.
+        setInnateEffect(player, MobEffects.JUMP, race == Race.BEASTKIN, 1);
 
         // Angelkin/Demonkin need no grant call here at all any more - IcarusWingHooks makes Icarus think they
         // have wings purely off their race, no real Curios item involved (see that class for why: a real item
@@ -106,10 +114,26 @@ public final class RaceEffects
         IcarusIntegration.removeWings(player);
     }
 
+    /** Shared by RaceEffectEvents' own Merfolk underwater-vision tick logic, so both respect the same toggle. */
+    public static boolean passiveVisualsEnabled(ServerPlayer player)
+    {
+        return PlayerRaceCapability.get(player).map(IPlayerRace::isPassiveVisualsEnabled).orElse(true);
+    }
+
     private static void setInnateEffect(ServerPlayer player, net.minecraft.world.effect.MobEffect effect, boolean shouldHave)
     {
+        setInnateEffect(player, effect, shouldHave, 0);
+    }
+
+    private static void setInnateEffect(ServerPlayer player, net.minecraft.world.effect.MobEffect effect, boolean shouldHave, int amplifier)
+    {
+        // duration -1 is vanilla's own "infinite" marker, not just a very long number - confirmed by decompiling
+        // MobEffectInstance directly: isInfiniteDuration() checks duration == -1, and mapDuration() (which
+        // tickDownDuration() calls every tick) returns the duration completely unchanged whenever that's true,
+        // so it never actually counts down at all. The previous 999999 was real, finite duration (~13.9 hours)
+        // that would eventually run out and needed a reapply before then - this doesn't.
         if (shouldHave)
-            player.addEffect(new MobEffectInstance(effect, 999999, 0, true, false, false));
+            player.addEffect(new MobEffectInstance(effect, -1, amplifier, true, false, false));
         else
             player.removeEffect(effect);
     }

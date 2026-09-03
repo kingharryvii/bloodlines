@@ -15,7 +15,7 @@ import javax.annotation.Nullable;
 public class PlayerRaceProvider implements ICapabilitySerializable<CompoundTag>
 {
     private final PlayerRace playerRace = new PlayerRace();
-    private final LazyOptional<IPlayerRace> lazyOptional = LazyOptional.of(() -> playerRace);
+    private LazyOptional<IPlayerRace> lazyOptional = LazyOptional.of(() -> playerRace);
 
     @Nonnull
     @Override
@@ -24,9 +24,32 @@ public class PlayerRaceProvider implements ICapabilitySerializable<CompoundTag>
         return cap == PlayerRaceCapability.PLAYER_RACE ? lazyOptional.cast() : LazyOptional.empty();
     }
 
+    /**
+     * This is the real cause behind "lost my race/abilities after changing dimension, and after that even death
+     * and relogging couldn't bring it back" - traced through three separate decompiled methods, not guessed.
+     * Entity#remove(RemovalReason) unconditionally calls invalidateCaps() for ANY removal, not just death -
+     * including the CHANGED_DIMENSION reason ServerPlayer#changeDimension() uses on a player entity that isn't
+     * being discarded, just moved to a different level. CapabilityProvider#invalidateCaps() then calls
+     * CapabilityDispatcher.invalidate(), which invalidates every registered LazyOptional - permanently, by
+     * design (a LazyOptional can never become valid again once invalidated, that's fundamental to the class).
+     * changeDimension() does call Entity#revive() on the same persisting entity right afterward, and revive()
+     * does call reviveCaps() - but CapabilityProvider#reviveCaps() only flips an internal "valid" boolean back to
+     * true. It has no way to touch OUR already-dead LazyOptional object, since that object was ours to create,
+     * not the engine's. Before this fix, getCapability() kept returning that same permanently-dead LazyOptional
+     * forever after a player's first dimension change of a session - every ifPresent() on it silently did
+     * nothing, no exception, nothing in any log, which is exactly why this looked like a resync/timing problem
+     * (the class doc on PlayerRaceEvents' respawn/dimension-change handlers) rather than what it actually was.
+     * It also explains the death-after-that symptom: onDeath's own snapshot read from this same dead capability,
+     * so it silently captured nothing, meaning the post-respawn player started completely blank - and eventually
+     * an autosave writes that blank state to disk, which is why relogging popped the race-selection screen too.
+     * The fix: recreate the LazyOptional here, in the same invalidate() callback Forge already calls for us, so
+     * the *next* getCapability() call - once reviveCaps() flips valid back to true - returns a fresh, working
+     * LazyOptional wrapping the same underlying PlayerRace object, instead of the dead original.
+     */
     public void invalidate()
     {
         lazyOptional.invalidate();
+        lazyOptional = LazyOptional.of(() -> playerRace);
     }
 
     @Override
@@ -39,6 +62,8 @@ public class PlayerRaceProvider implements ICapabilitySerializable<CompoundTag>
         for (Race race : playerRace.getUnlockedRaces())
             unlocked.add(StringTag.valueOf(race.name()));
         tag.put("Unlocked", unlocked);
+
+        tag.putBoolean("PassiveVisualsEnabled", playerRace.isPassiveVisualsEnabled());
 
         return tag;
     }
@@ -57,6 +82,10 @@ public class PlayerRaceProvider implements ICapabilitySerializable<CompoundTag>
             for (int i = 0; i < unlocked.size(); i++)
                 tryParseRace(unlocked.getString(i)).ifPresent(playerRace::unlockRace);
         }
+
+        // Missing (older save, or never toggled off) defaults to true via getBoolean's own missing-key behavior.
+        if (tag.contains("PassiveVisualsEnabled"))
+            playerRace.setPassiveVisualsEnabled(tag.getBoolean("PassiveVisualsEnabled"));
     }
 
     private static java.util.Optional<Race> tryParseRace(String name)

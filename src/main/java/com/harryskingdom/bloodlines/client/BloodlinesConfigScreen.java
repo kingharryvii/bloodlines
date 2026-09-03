@@ -23,18 +23,24 @@ import java.util.List;
  * Hand-rolled "Config" screen for the Mods list (no Cloth Config dependency - just Forge's own
  * ConfigScreenHandler.ConfigScreenFactory extension point plus vanilla widgets).
  * <p>
- * Two different players can legitimately edit this, and they save two different ways:
- * - The singleplayer/LAN host: their BloodlinesConfig.SPEC IS the real file, so Save writes to it directly, the
- *   same technique any hand-rolled COMMON-config screen would use.
- * - An op connected to someone else's dedicated server: traced through Forge's real sync code
- *   (ConfigSync.receiveSyncedConfig, ModConfig.acceptSyncedConfig/save) - their client's SERVER-type config has
- *   its backing object replaced by a plain in-memory CommentedConfig parsed straight from the sync packet, not
- *   the original CommentedFileConfig. ModConfig.save() unconditionally casts to CommentedFileConfig, so calling
- *   it on a synced client throws a ClassCastException outright - there's no built-in mechanism for a client to
- *   push config edits back to a remote server, the sync is one-directional by design. So instead, Save sends
- *   UpdateBloodlinesConfigPacket to the server, which re-checks hasPermissions(2) itself (never trust the
- *   client-side gate alone for something privileged) and applies the change to its own real config there.
- * A player who is neither gets a read-only view of the same rows instead of a broken Save button.
+ * Save always goes through UpdateBloodlinesConfigPacket to the server, host and remote op alike - never a
+ * direct local .set()/.save() here, even for the singleplayer host. Two reasons:
+ * - It has to work that way for a remote op: traced through Forge's real sync code (ConfigSync.receiveSyncedConfig,
+ *   ModConfig.acceptSyncedConfig/save), a client connected to someone else's server has its SERVER-type config's
+ *   backing object replaced by a plain in-memory CommentedConfig parsed straight from the sync packet, not the
+ *   original CommentedFileConfig. ModConfig.save() unconditionally casts to CommentedFileConfig, so calling it on
+ *   a synced client throws a ClassCastException outright - there's no built-in mechanism for a client to push
+ *   config edits back to a remote server, the sync is one-directional by design.
+ * - For the host it's not strictly required (their own BloodlinesConfig.SPEC IS the real file, since
+ *   receiveSyncedConfig explicitly skips the replace-with-synced-copy step whenever Minecraft.isLocalServer() is
+ *   true) - but sending the packet anyway, over the loopback connection every singleplayer world already uses for
+ *   networking, means the fix below covers the host for free instead of needing its own separate code path.
+ * The real bug this fixes: a host or op who saved, then reopened the screen, saw their old values again - not
+ * because the save failed, but because this screen's rows always read BloodlinesConfig.*.get() directly, and
+ * Forge only pushes a SERVER config sync once, at login. Nothing was refreshing that cached copy after a live
+ * change, on any client, including the one that made it. UpdateBloodlinesConfigPacket's handler now broadcasts
+ * SyncBloodlinesConfigPacket to every connected player after a successful save specifically to close that gap.
+ * A player who is neither host nor op gets a read-only view of the same rows instead of a broken Save button.
  * <p>
  * The row list is scrollable - an earlier fixed-offset-from-height/2 layout looked fine at GUI Scale 1 on a
  * large window but overlapped the title at higher scale/smaller windows (this.width/this.height shrink as GUI
@@ -225,8 +231,7 @@ public final class BloodlinesConfigScreen extends Screen
     {
         // Belt-and-suspenders - the Save button only exists when editable, but this is exactly the kind of
         // boundary worth checking again right before the action it guards rather than trusting the UI alone.
-        boolean host = isHost();
-        if (!host && !isOp())
+        if (!isHost() && !isOp())
             return;
 
         try
@@ -241,28 +246,11 @@ public final class BloodlinesConfigScreen extends Screen
             BloodlinesConfig.MaxArmorTier angelkinTier = angelkinArmorTierButton.getValue();
             BloodlinesConfig.MaxArmorTier demonkinTier = demonkinArmorTierButton.getValue();
 
-            if (host)
-            {
-                // The host's own BloodlinesConfig.SPEC is the real file - safe to write directly, same as any
-                // ordinary COMMON-config screen would.
-                BloodlinesConfig.FAE_REQUIRED_FOOD_LEVEL.set(foodLevel);
-                BloodlinesConfig.FAE_EXHAUSTION_PER_BOOST_TICK.set(exhaustion);
-                BloodlinesConfig.FAE_FLYING_SPEED.set(flySpeed);
-                BloodlinesConfig.FAE_MAX_ARMOR_TIER.set(faeTier);
-                BloodlinesConfig.ANGELKIN_MAX_ARMOR_TIER.set(angelkinTier);
-                BloodlinesConfig.DEMONKIN_MAX_ARMOR_TIER.set(demonkinTier);
-                BloodlinesConfig.ABILITY_COOLDOWN_SECONDS.set(cooldown);
-                BloodlinesConfig.ABILITY_DURATION_SECONDS.set(duration);
-                BloodlinesConfig.ORB_SPAWN_RARITY_MULTIPLIER.set(orbRarity);
-                BloodlinesConfig.SPEC.save();
-            }
-            else
-            {
-                // An op on a remote server - their local SPEC is only a synced read-only copy (see class doc), so
-                // the real write has to happen server-side instead.
-                BloodlinesNetwork.CHANNEL.sendToServer(new UpdateBloodlinesConfigPacket(
-                        foodLevel, exhaustion, flySpeed, faeTier, angelkinTier, demonkinTier, cooldown, duration, orbRarity));
-            }
+            // Always over the network, even for the host - see class doc for why: it's not just the only option
+            // for a remote op, it's also what makes the post-save broadcast (which fixes stale cached values on
+            // every client, including this one) apply uniformly instead of needing a separate host-only path.
+            BloodlinesNetwork.CHANNEL.sendToServer(new UpdateBloodlinesConfigPacket(
+                    foodLevel, exhaustion, flySpeed, faeTier, angelkinTier, demonkinTier, cooldown, duration, orbRarity));
 
             onClose();
         }

@@ -23,7 +23,7 @@ public enum Race
     DEMON(Tier.RARE, "Demonkin", "Infernal blood runs hot — fire given a mortal shape.", false, null),
     TROLL(Tier.RARE, "Troll", "Ancient giants who shrug off wounds that would kill anyone else.", false, null),
     MERFOLK(Tier.RARE, "Merfolk", "Sea-born people, as deadly in the depths as they are graceful.", false, null),
-    SERAPH(Tier.RARE, "Angelkin", "Winged and towering, radiant with a light that isn't always kind.", false, null);
+    SERAPH(Tier.RARE, "Angelkin", "Winged and radiant, with a light that isn't always kind.", false, null);
 
     private final Tier tier;
     private final String displayName;

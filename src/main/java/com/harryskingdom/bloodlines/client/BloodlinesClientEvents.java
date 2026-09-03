@@ -2,6 +2,7 @@ package com.harryskingdom.bloodlines.client;
 
 import com.harryskingdom.bloodlines.BloodlinesMod;
 import com.harryskingdom.bloodlines.network.BloodlinesNetwork;
+import com.harryskingdom.bloodlines.network.TogglePassiveVisualsPacket;
 import com.harryskingdom.bloodlines.network.UseRaceAbilityPacket;
 import com.harryskingdom.bloodlines.race.ClientRaceCache;
 import com.harryskingdom.bloodlines.race.Race;
@@ -29,6 +30,9 @@ public class BloodlinesClientEvents
 
         while (BloodlinesKeyMappings.USE_SECONDARY_ABILITY.consumeClick())
             BloodlinesNetwork.CHANNEL.sendToServer(new UseRaceAbilityPacket(true));
+
+        while (BloodlinesKeyMappings.TOGGLE_PASSIVE_VISUALS.consumeClick())
+            BloodlinesNetwork.CHANNEL.sendToServer(new TogglePassiveVisualsPacket());
     }
 
     /**

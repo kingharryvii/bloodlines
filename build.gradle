@@ -125,6 +125,7 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 repositories {
     // Put repositories for dependencies here
     // ForgeGradle automatically adds the Forge maven and Maven Central for you
+    mavenCentral()
 
     // If you have mod jar dependencies in ./libs, you can declare them as a repository like so.
     // See https://docs.gradle.org/current/userguide/declaring_repositories.html#sub:flat_dir_resolver
@@ -169,12 +170,12 @@ dependencies {
     compileOnly files('libs/curios-forge-5.14.1+1.20.1.jar')
 
     // Mixin, isolated to the single Merfolk swim-rotation fix in mixin/MerfolkSwimRotationMixin - see that
-    // class's own doc comment for why (matching the real MerMod mod's own technique, which needed hooking a
-    // point no plain Forge event exposes). Nothing else in this mod uses Mixin. (A second use was attempted for
-    // a Fae flying-limb-freeze feature and abandoned - the injection never fired at runtime despite the refmap,
-    // bytecode call chain, and require=1 injector validation all checking out correctly, down to a bare
-    // log-only injection into a guaranteed-called method still not firing even after a clean rebuild. Root
-    // cause was never found; not worth the time against a purely cosmetic feature.)
+    // class's own doc comment for why. CLAUDE.md's "Abandoned: new Mixin injections that verify but never
+    // execute" section has the full history of every other Mixin attempt made in this project (a Merfolk
+    // leggings/boots-hiding fix, four structurally different techniques including MixinExtras' own
+    // @WrapWithCondition) - all compiled clean and passed every static check but never took effect at runtime,
+    // confirmed even outside the dev environment, for reasons never found. MixinExtras was removed again after
+    // that: nothing in this project still needs it.
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 

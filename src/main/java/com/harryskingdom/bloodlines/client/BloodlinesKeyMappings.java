@@ -23,5 +23,12 @@ public final class BloodlinesKeyMappings
             CATEGORY
     );
 
+    public static final KeyMapping TOGGLE_PASSIVE_VISUALS = new KeyMapping(
+            "key.harrys_bloodlines.toggle_passive_visuals",
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_N),
+            CATEGORY
+    );
+
     private BloodlinesKeyMappings() {}
 }

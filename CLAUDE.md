@@ -140,16 +140,54 @@ git history / conversation for the reasoning). If Beastkin's tail base ever look
 with pose changes, this is almost certainly why — same bug class as the Merfolk one, just not yet
 carried over.
 
-## Abandoned: Fae flying-limb-freeze
+## Abandoned: new Mixin injections never execute, project-wide, confirmed root cause never found
 
-A feature request (hold a flying Fae's arms/legs in a neutral pose instead of playing the walk
-animation) was attempted and abandoned. The injection point was structurally correct — verified via
-direct bytecode disassembly that the real call chain reaches `PlayerModel.setupAnim()`, verified via
-`require = 1` that Mixin's own static application succeeded — but the injected code never
-demonstrably executed at runtime (no visible pose change, no log line, even on a bare-minimum
-isolation-test injection into an unrelated, guaranteed-called method, even after a full clean
-rebuild). Root cause was never found. Not worth further time against a purely cosmetic feature — see
-git history around the removal commit for the full diagnostic trail if this gets revisited.
+Any *new* Mixin class added to this project — anything beyond the original `MerfolkSwimRotationMixin`,
+which has been in place since before this was first noticed and still demonstrably works — passes
+every static check (annotation processor accepts the target method, the built jar's refmap resolves
+it to a real obfuscated name, `require = 1` raises no error, the game boots fine) but never
+demonstrably executes at runtime. This was chased across two separate features in two separate
+sessions before being conclusively proven project-wide, not feature-specific:
+
+- A minimal isolation test (`Minecraft#tick()`, the simplest possible non-generic target, handler body
+  unconditionally throwing an exception) never crashed the game — not once, not even at the main menu,
+  across a fully clean `gradlew clean build` with no Gradle daemon reused between builds.
+- The same test jar, dropped into a real, non-dev, production Minecraft client (not the ForgeGradle
+  `runClient` userdev environment) — still no crash. Rules out a dev-environment-specific quirk too.
+- A differential logging test showed even the *known-working* `MerfolkSwimRotationMixin`'s own log
+  line never appeared in console output either — so "no log line" was never reliable evidence on its
+  own; this project's logging setup just doesn't surface Mixin-handler output, working or not. Only a
+  hard crash (an unmissable, unambiguous signal) or an actual observed gameplay effect can prove a new
+  Mixin fires here.
+
+Root cause never found despite exhausting every plausible explanation: config registration (confirmed
+correct at every path the runtime actually reads, not just the built jar), refmap staleness, generic
+vs. non-generic target classes, four structurally different injector techniques (`@Inject` with erased
+types, `@Inject` with the target's own generics replicated to match a real shipped Fabric mod's
+equivalent fix, `@Redirect`, and MixinExtras' `@WrapWithCondition` matching the real MerMod mod's own
+technique for the same problem) - **all four fixes** were themselves verified correct via decompile and
+even matched against real, working mods' actual source, not guessed.
+
+- **Fae flying-limb-freeze** (hold a flying Fae's arms/legs in a neutral pose instead of playing the
+  walk animation): verified via direct bytecode disassembly that the real call chain reaches
+  `PlayerModel.setupAnim()`. Abandoned — see git history around the removal commit for the full
+  diagnostic trail if this gets revisited.
+- **Merfolk leggings/boots showing through the tail** (`HumanoidArmorLayer` renders leggings/boots
+  through its own separate `innerModel`/`outerModel` instances, completely independent of the base
+  `PlayerModel` legs `BloodlinesClientEvents#onRenderPlayerPre` already hides): all four techniques
+  above were tried specifically against `HumanoidArmorLayer#renderArmorPiece()`/`#render()`, including
+  the MixinExtras dependency (added, then removed again once it also failed - nothing in this project
+  needs it). Abandoned — leggings/boots visibly show through the Merfolk tail as a known cosmetic
+  limitation. The one untried option left: a reflection-based approach reading `HumanoidArmorLayer`'s
+  private `innerModel`/`outerModel` fields directly from `onRenderPlayerPre` — untried because it can't
+  work as a simple visibility toggle there (vanilla's own `setPartVisibility()` re-enables those parts
+  *after* `Pre` fires, right before each piece draws, so anything set in `Pre` gets overwritten before
+  it would take effect); would need clearing the parts' actual geometry instead of their visibility
+  flag to survive that, which is a materially different, untried approach.
+
+If this gets revisited, start by re-running the `Minecraft#tick()` crash test above (cheap, ~2 minutes,
+completely unambiguous) before spending any real time on a new attempt — if it still doesn't crash,
+nothing else has changed about the underlying problem.
 
 ## Soft integrations (all optional, mod loads fine without any of them)
 

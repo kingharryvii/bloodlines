@@ -7,18 +7,22 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraftforge.network.NetworkEvent;
+import net.minecraftforge.network.PacketDistributor;
 
 import java.util.function.Supplier;
 
 /**
- * C2S - an op editing BloodlinesConfig from BloodlinesConfigScreen while connected to someone else's dedicated
- * server (not the singleplayer/LAN host). That client's own BloodlinesConfig.SPEC is a synced, read-only copy -
- * see BloodlinesConfigScreen's class doc for why calling .save() on it directly throws - so instead of writing
- * locally, the new values are sent here and applied on the server's own real, file-backed config.
+ * C2S - BloodlinesConfigScreen's Save button sends this, host and remote op alike (see the screen's own class doc
+ * for why even the host goes over the network instead of writing locally). hasPermissions(2) is checked again
+ * here even though the screen already hides Save from non-ops: the screen's gate only stops the normal client
+ * from sending this packet, not a modified one crafted by hand, so the actual authorization boundary has to live
+ * here, not in the GUI.
  * <p>
- * hasPermissions(2) is checked again here even though the screen already hides Save from non-ops: the screen's
- * gate only stops the normal client from sending this packet, not a modified one crafted by hand, so the actual
- * authorization boundary has to live here, not in the GUI.
+ * On success, broadcasts SyncBloodlinesConfigPacket to every connected player - without it, everyone's local
+ * BloodlinesConfig.*.get() (including the editor's own, and every client's cooldown/duration HUD bars) would
+ * keep reading whatever was cached at their own login, since Forge's SERVER-config sync never fires again after
+ * that. That was the actual cause behind "I hit Save, but reopening the menu shows the old values" - the save
+ * itself always worked, nothing was pushing the new numbers back out to any client afterward.
  */
 public class UpdateBloodlinesConfigPacket
 {
@@ -110,6 +114,7 @@ public class UpdateBloodlinesConfigPacket
             BloodlinesConfig.ORB_SPAWN_RARITY_MULTIPLIER.set(Mth.clamp(msg.orbRarityMultiplier, BloodlinesConfig.ORB_RARITY_MULTIPLIER_MIN, BloodlinesConfig.ORB_RARITY_MULTIPLIER_MAX));
             BloodlinesConfig.SPEC.save();
 
+            BloodlinesNetwork.CHANNEL.send(PacketDistributor.ALL.noArg(), new SyncBloodlinesConfigPacket());
             player.sendSystemMessage(Component.literal("Bloodlines config updated.").withStyle(ChatFormatting.GREEN));
         });
         ctx.setPacketHandled(true);

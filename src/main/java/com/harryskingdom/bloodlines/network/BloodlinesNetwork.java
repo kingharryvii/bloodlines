@@ -33,5 +33,9 @@ public final class BloodlinesNetwork
                 AbilityActivatedPacket::encode, AbilityActivatedPacket::decode, AbilityActivatedPacket::handle);
         CHANNEL.registerMessage(id++, UpdateBloodlinesConfigPacket.class,
                 UpdateBloodlinesConfigPacket::encode, UpdateBloodlinesConfigPacket::decode, UpdateBloodlinesConfigPacket::handle);
+        CHANNEL.registerMessage(id++, SyncBloodlinesConfigPacket.class,
+                SyncBloodlinesConfigPacket::encode, SyncBloodlinesConfigPacket::decode, SyncBloodlinesConfigPacket::handle);
+        CHANNEL.registerMessage(id++, TogglePassiveVisualsPacket.class,
+                TogglePassiveVisualsPacket::encode, TogglePassiveVisualsPacket::decode, TogglePassiveVisualsPacket::handle);
     }
 }

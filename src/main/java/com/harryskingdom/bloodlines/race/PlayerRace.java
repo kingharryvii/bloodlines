@@ -8,6 +8,7 @@ public class PlayerRace implements IPlayerRace
 {
     private Race race;
     private final Set<Race> unlockedRaces = EnumSet.noneOf(Race.class);
+    private boolean passiveVisualsEnabled = true;
 
     @Override
     public Optional<Race> getRace()
@@ -43,5 +44,17 @@ public class PlayerRace implements IPlayerRace
     public boolean canSelect(Race race)
     {
         return !race.isLocked() || unlockedRaces.contains(race);
+    }
+
+    @Override
+    public boolean isPassiveVisualsEnabled()
+    {
+        return passiveVisualsEnabled;
+    }
+
+    @Override
+    public void setPassiveVisualsEnabled(boolean enabled)
+    {
+        passiveVisualsEnabled = enabled;
     }
 }

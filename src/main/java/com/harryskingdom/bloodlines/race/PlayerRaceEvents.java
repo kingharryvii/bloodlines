@@ -116,6 +116,65 @@ public class PlayerRaceEvents
         }));
     }
 
+    /**
+     * "Died and lost my buffs" had a portal-travel twin: took a nether/end portal, attribute-based race stats
+     * (health/speed/damage/knockback/luck/attack-speed - everything RaceEffects grants via
+     * AttributeInstance.addTransientModifier) silently stopped applying until a full disconnect/reconnect.
+     * Traced through ServerPlayer#changeDimension's actual bytecode, not guessed: that method sends the exact
+     * same ClientboundRespawnPacket death/respawn does - which tears down and rebuilds the client's player object
+     * the same way - and afterward it DOES correctly resend both a fresh ClientboundPlayerAbilitiesPacket and
+     * every active MobEffectInstance (both explicitly present in its own bytecode, in the right order after the
+     * respawn packet, with nothing resetting either afterward - confirmed by reading all the way to the method's
+     * own return). It does not resend attribute modifiers at all - that sync only fires when something marks an
+     * AttributeInstance dirty, and changeDimension() never touches ours.
+     * <p>
+     * PlayerChangedDimensionEvent fires as the very last step of changeDimension(), which looked like the safe
+     * spot to reapply from - but an immediate RaceEffects.apply() here still didn't fix it in testing (confirmed
+     * against a real portal, not the /execute in ... run tp command, which turned out to route through a
+     * different method - ServerPlayer#teleportTo - that never fires this event at all and was the wrong way to
+     * test this in the first place). Most likely cause: the player's own tracked-entity bookkeeping for the new
+     * level isn't fully in place yet the instant this event fires, so marking attributes dirty here gets lost
+     * once that bookkeeping actually settles a moment later - the same class of "our reapply and the engine's own
+     * internal state race each other" problem the respawn fix hit, just one layer deeper this time. Rather than
+     * chase the exact tick that race resolves on, this reuses the same delayed-reapply fallback already proven
+     * for login (pendingReapply/REAPPLY_DELAY_TICKS, originally added for third-party capabilities like Pehkui
+     * not being ready instantly) - by the time it fires a second later, everything has settled.
+     */
+    @SubscribeEvent
+    public static void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event)
+    {
+        if (!(event.getEntity() instanceof ServerPlayer player))
+            return;
+
+        PlayerRaceCapability.get(player).ifPresent(data -> data.getRace().ifPresent(race -> RaceEffects.apply(player, race)));
+        pendingReapply.put(player.getUUID(), REAPPLY_DELAY_TICKS);
+    }
+
+    /**
+     * Leaving Creative mode (back to Survival) also loses Fae's flight, for a related but distinct reason from
+     * the other two - traced through ServerPlayer#setGameMode(GameType) and ForgeHooks#onChangeGameType, not
+     * guessed. setGameMode() fires PlayerChangeGameModeEvent first - it's a pre-change, cancellable event (you
+     * can call setNewGameMode() on it, or cancel it outright, which is only possible before the change happens) -
+     * and only afterward calls ServerPlayerGameMode#changeGameModeForPlayer(), which is what actually calls
+     * GameType.updatePlayerAbilities() and resets mayfly/flying to Survival's defaults (the exact same vanilla
+     * mechanism behind the very first bug this session, just triggered by a mode switch instead of a respawn).
+     * There's no Forge event that fires AFTER that reset completes - setGameMode() just returns once its own
+     * cleanup (onUpdateAbilities(), updateEffectVisibility()) is done, nothing further to hook. Calling
+     * RaceEffects.apply() directly from this event would run before the reset and get immediately undone by it,
+     * the same "our reapply and the engine's own internal state race each other" problem as the dimension-change
+     * fix - so this queues the same delayed reapply instead of trying to react synchronously. Harmless when
+     * switching INTO creative too: RaceEffects.setMayFly() already no-ops for isCreative()/isSpectator() players,
+     * so the delayed reapply just does nothing useful until they actually leave creative again.
+     */
+    @SubscribeEvent
+    public static void onPlayerChangeGameMode(PlayerEvent.PlayerChangeGameModeEvent event)
+    {
+        if (!(event.getEntity() instanceof ServerPlayer player))
+            return;
+
+        pendingReapply.put(player.getUUID(), REAPPLY_DELAY_TICKS);
+    }
+
     // Curios used to sync equipped wing items to observers for free; race isn't backed by an item any more, so
     // we sync it ourselves whenever a new client starts tracking a player (i.e. that player just came into view).
     @SubscribeEvent
@@ -129,6 +188,18 @@ public class PlayerRaceEvents
                         new SyncPlayerRacePacket(tracked.getId(), race))));
     }
 
+    /**
+     * RaceEffects.apply() is NOT called synchronously here on purpose - traced a server watchdog crash to this
+     * exact spot: a player logging in while the server was still actively generating new terrain (bettercaves
+     * mid-generation) triggered PehkuiIntegration.resetScale() -> Pehkui's own ScaleData.resetScale(), which does
+     * a ground/collision check that needed a chunk that wasn't finished generating yet, stalling the entire main
+     * thread long enough to trip the watchdog. Login is the one place in this class where a fresh player joining
+     * a not-yet-loaded area is actually likely, unlike respawn/dimension-change/game-mode-switch which normally
+     * happen well after someone's already been playing in an already-loaded area. The client-facing race sync
+     * packet still goes out immediately below - only the potentially-blocking Pehkui call moves onto the same
+     * tick-delayed pendingReapply path onPlayerChangeGameMode already uses safely for the same "don't call a
+     * third-party mod synchronously from inside this event" reason.
+     */
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event)
     {
@@ -140,11 +211,8 @@ public class PlayerRaceEvents
             if (data.hasChosenRace())
             {
                 data.getRace().ifPresent(race ->
-                {
-                    RaceEffects.apply(player, race);
-                    BloodlinesNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
-                            new SyncPlayerRacePacket(player.getId(), race));
-                });
+                        BloodlinesNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                                new SyncPlayerRacePacket(player.getId(), race)));
                 pendingReapply.put(player.getUUID(), REAPPLY_DELAY_TICKS);
             }
             else

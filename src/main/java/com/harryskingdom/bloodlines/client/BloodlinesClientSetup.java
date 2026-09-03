@@ -38,6 +38,7 @@ public class BloodlinesClientSetup
     {
         event.register(BloodlinesKeyMappings.USE_PRIMARY_ABILITY);
         event.register(BloodlinesKeyMappings.USE_SECONDARY_ABILITY);
+        event.register(BloodlinesKeyMappings.TOGGLE_PASSIVE_VISUALS);
     }
 
     @SubscribeEvent
