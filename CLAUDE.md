@@ -4,6 +4,12 @@ A custom race/bloodline system for a private Forge 1.20.1 modpack. This file is 
 both future Claude Code sessions and for you — it captures the state of the mod, the architecture,
 and the non-obvious lessons learned building it, so none of that has to be rediscovered.
 
+**See also `CHANGELOG.md`** — a dated, plain-language log of what's actually shipped, meant for any
+reader (a person, another AI, a future session) to catch up quickly without digging through git log.
+This file (CLAUDE.md) is the "how it's built and why" reference; CHANGELOG.md is the "what happened
+and when" one. Add an entry there for any meaningful batch of changes, the same way this file gets
+kept current.
+
 ## Where everything lives
 
 - **Project root**: `D:\Minecraft Development\Harrys Kingdom\Bloodlines` (moved back here; it had
