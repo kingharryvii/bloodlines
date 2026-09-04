@@ -417,6 +417,17 @@ public class RaceEffectEvents
                     player.setDeltaMovement(velocity.x * scale, velocity.y, velocity.z * scale);
                 }
             }
+
+            // Demonkin's Fire Resistance already blocks the actual damage from lava/fire (see RaceEffects -
+            // MobEffects.FIRE_RESISTANCE, real vanilla effect, granted permanently), but confirmed by decompiling
+            // Entity#lavaHurt(): it unconditionally calls setSecondsOnFire(15) with no Fire Resistance check at
+            // all - that check only exists later, at LivingEntity#hurt()'s damage-cancellation stage. So a
+            // Fire-Resistant entity still visually "catches fire" every time it touches lava (or any other fire
+            // source), same burning overlay as anyone else, even though it takes zero damage from it. Doesn't fit
+            // a race that's supposed to be genuinely at home in fire - clearFire() every tick they're alight
+            // removes the overlay instantly rather than waiting out the (harmless but visible) burn duration.
+            if (race == Race.DEMON && player.isOnFire())
+                player.clearFire();
         });
     }
 
